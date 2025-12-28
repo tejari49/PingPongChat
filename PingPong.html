@@ -242,7 +242,9 @@
         import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, doc, getDoc, setDoc, updateDoc, arrayUnion } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
         import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
         
-        // Firebase configuration (placeholder - replace with actual config)
+        // Firebase configuration
+        // IMPORTANT: Replace these placeholder values with your actual Firebase config
+        // Consider using environment variables or a secure configuration method in production
         const firebaseConfig = {
             apiKey: "YOUR_API_KEY",
             authDomain: "YOUR_AUTH_DOMAIN",
@@ -283,10 +285,16 @@
                 // Fix 3: try/catch für loadUserProfile
                 try {
                     await loadUserProfile();
+                } catch (error) {
+                    console.error('Fehler beim Laden des Profils:', error);
+                    showToast('Fehler beim Laden des Profils', 'error');
+                }
+                
+                try {
                     await loadFriends();
                 } catch (error) {
-                    console.error('Fehler beim Initialisieren:', error);
-                    showToast('Fehler beim Laden der Daten', 'error');
+                    console.error('Fehler beim Laden der Freunde:', error);
+                    showToast('Fehler beim Laden der Freunde', 'error');
                 }
             } else {
                 currentUser = null;
@@ -384,7 +392,7 @@
                 
                 // Fix 2: Event-Listener programmatisch hinzufügen statt inline onclick
                 img.addEventListener('click', () => {
-                    viewImage(msg.timestamp, msg.content);
+                    viewImage(msg.content);
                 });
                 
                 bubble.appendChild(img);
@@ -521,7 +529,7 @@
             }
         };
         
-        window.viewImage = function(timestamp, content) {
+        window.viewImage = function(content) {
             document.getElementById('modalImage').src = content;
             document.getElementById('imageModal').classList.add('show');
         };
@@ -615,7 +623,10 @@
             setTimeout(() => {
                 toast.classList.remove('show');
                 setTimeout(() => {
-                    container.removeChild(toast);
+                    // Safe removal - check if element still has parent
+                    if (toast.parentNode) {
+                        toast.parentNode.removeChild(toast);
+                    }
                 }, 300);
             }, 3000);
         };
