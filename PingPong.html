@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>PingPong Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --card-bg: #ffffff;
+            --card-border: #e5e7eb;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+        }
+        
+        .theme-dark {
+            --card-bg: #1f2937;
+            --card-border: #374151;
+            --text-primary: #f9fafb;
+            --text-secondary: #d1d5db;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--card-bg);
+            color: var(--text-primary);
+        }
+        
+        .font-hand {
+            font-family: 'Comic Sans MS', cursive;
+        }
+        
+        .font-elegant {
+            font-family: 'Georgia', serif;
+        }
+        
+        .font-big {
+            font-size: 1.2em;
+        }
+        
+        .chat-bubble {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            margin-bottom: 8px;
+            word-wrap: break-word;
+        }
+        
+        .chat-bubble.sent {
+            background: #3b82f6;
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .chat-bubble.received {
+            background: var(--card-border);
+            color: var(--text-primary);
+            border-bottom-left-radius: 4px;
+        }
+        
+        .chat-image {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+        
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .modal.show {
+            display: flex;
+        }
+        
+        .modal img {
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 8px;
+        }
+        
+        /* Fix 4: Toast CSS-Styles */
+        .toast {
+            background: var(--card-bg);
+            border: 2px solid var(--card-border);
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-weight: bold;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.3s ease;
+        }
+        
+        .toast.show { 
+            opacity: 1; 
+            transform: translateY(0); 
+        }
+        
+        .toast.error { 
+            background: #fee2e2; 
+            border-color: #ef4444; 
+            color: #991b1b; 
+        }
+        
+        .toast.success { 
+            background: #d1fae5; 
+            border-color: #10b981; 
+            color: #065f46; 
+        }
+        
+        /* Fix 5: pb-safe Klasse */
+        .pb-safe {
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+        }
+        
+        .friend-item {
+            padding: 12px;
+            border-bottom: 1px solid var(--card-border);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .friend-item:hover {
+            background: var(--card-border);
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="min-h-screen">
+        <!-- Login Screen -->
+        <div id="loginScreen" class="flex items-center justify-center min-h-screen p-4">
+            <div class="w-full max-w-md">
+                <h1 class="text-3xl font-bold mb-8 text-center">PingPong Chat</h1>
+                <div class="space-y-4">
+                    <input type="email" id="emailInput" placeholder="E-Mail" class="w-full p-3 border rounded-lg">
+                    <input type="password" id="passwordInput" placeholder="Passwort" class="w-full p-3 border rounded-lg">
+                    <button onclick="login()" class="w-full bg-blue-500 text-white p-3 rounded-lg font-bold">Anmelden</button>
+                    <button onclick="register()" class="w-full bg-green-500 text-white p-3 rounded-lg font-bold">Registrieren</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Chat Screen -->
+        <div id="chatScreen" class="hidden flex flex-col h-screen">
+            <!-- Header -->
+            <div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4">
+                <div class="flex items-center justify-between">
+                    <h2 id="chatTitle" class="text-xl font-bold">Chat</h2>
+                    <div class="flex gap-2">
+                        <button onclick="showSettings()" class="p-2 rounded-lg hover:bg-gray-100">⚙️</button>
+                        <button onclick="showFriends()" class="p-2 rounded-lg hover:bg-gray-100">👥</button>
+                        <button onclick="logout()" class="p-2 rounded-lg hover:bg-gray-100">🚪</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Messages -->
+            <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-2">
+            </div>
+            
+            <!-- Input Area -->
+            <div class="border-t border-gray-200 dark:border-gray-700 p-4 pb-safe">
+                <div class="flex gap-2">
+                    <input type="text" id="messageInput" placeholder="Nachricht..." class="flex-1 p-3 border rounded-lg">
+                    <input type="file" id="imageInput" accept="image/*" class="hidden">
+                    <button onclick="document.getElementById('imageInput').click()" class="p-3 bg-gray-200 rounded-lg">📷</button>
+                    <button onclick="sendMessage()" class="p-3 bg-blue-500 text-white rounded-lg font-bold">Senden</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Settings Modal -->
+        <div id="settingsModal" class="modal">
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+                <h3 class="text-2xl font-bold mb-4">Einstellungen</h3>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block mb-2 font-bold">Theme:</label>
+                        <select id="themeSelect" onchange="setTheme(this.value)" class="w-full p-2 border rounded">
+                            <option value="light">Hell</option>
+                            <option value="dark">Dunkel</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block mb-2 font-bold">Schriftart:</label>
+                        <select id="fontSelect" onchange="setFont(this.value)" class="w-full p-2 border rounded">
+                            <option value="default">Standard</option>
+                            <option value="hand">Handschrift</option>
+                            <option value="elegant">Elegant</option>
+                            <option value="big">Groß</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <button onclick="closeSettings()" class="mt-6 w-full bg-blue-500 text-white p-3 rounded-lg font-bold">Schließen</button>
+            </div>
+        </div>
+        
+        <!-- Friends Modal -->
+        <div id="friendsModal" class="modal">
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+                <h3 class="text-2xl font-bold mb-4">Freunde</h3>
+                
+                <div class="mb-4">
+                    <input type="text" id="friendIdInput" placeholder="Freund ID" class="w-full p-2 border rounded">
+                    <button onclick="addFriend()" class="mt-2 w-full bg-green-500 text-white p-2 rounded-lg font-bold">Hinzufügen</button>
+                </div>
+                
+                <div id="friendsList" class="space-y-2 max-h-64 overflow-y-auto">
+                </div>
+                
+                <button onclick="closeFriends()" class="mt-6 w-full bg-blue-500 text-white p-3 rounded-lg font-bold">Schließen</button>
+            </div>
+        </div>
+        
+        <!-- Image Viewer Modal -->
+        <div id="imageModal" class="modal" onclick="closeImageModal()">
+            <img id="modalImage" src="" alt="Full Image">
+        </div>
+        
+        <!-- Toast Container -->
+        <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 2000;">
+        </div>
+    </div>
+    
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, doc, getDoc, setDoc, updateDoc, arrayUnion } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
+        
+        // Firebase configuration (placeholder - replace with actual config)
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+        
+        let currentUser = null;
+        let currentChatId = null;
+        let friends = [];
+        let messagesUnsubscribe = null;
+        
+        // Global variables
+        window.auth = auth;
+        window.db = db;
+        window.storage = storage;
+        window.currentUser = null;
+        window.friends = [];
+        
+        // Load settings on startup
+        loadSettings();
+        
+        // Auth state observer
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentUser = user;
+                window.currentUser = user;
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('chatScreen').classList.remove('hidden');
+                
+                // Fix 3: try/catch für loadUserProfile
+                await loadUserProfile();
+                await loadFriends();
+            } else {
+                currentUser = null;
+                window.currentUser = null;
+                document.getElementById('loginScreen').classList.remove('hidden');
+                document.getElementById('chatScreen').classList.add('hidden');
+            }
+        });
+        
+        // Fix 3: Fehlerbehandlung bei Firebase-Operationen
+        async function loadUserProfile() {
+            try {
+                const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+                if (!userDoc.exists()) {
+                    await setDoc(doc(db, 'users', currentUser.uid), {
+                        email: currentUser.email,
+                        uid: currentUser.uid,
+                        friends: []
+                    });
+                }
+            } catch (error) {
+                console.error('Fehler beim Laden des Benutzerprofils:', error);
+                showToast('Fehler beim Laden des Profils', 'error');
+            }
+        }
+        
+        async function loadFriends() {
+            try {
+                const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+                if (userDoc.exists()) {
+                    friends = userDoc.data().friends || [];
+                    window.friends = friends;
+                    renderFriends();
+                }
+            } catch (error) {
+                console.error('Fehler beim Laden der Freunde:', error);
+                showToast('Fehler beim Laden der Freunde', 'error');
+            }
+        }
+        
+        function renderFriends() {
+            const friendsList = document.getElementById('friendsList');
+            friendsList.innerHTML = '';
+            
+            if (friends.length === 0) {
+                friendsList.innerHTML = '<p class="text-gray-500 text-center py-4">Keine Freunde</p>';
+                return;
+            }
+            
+            friends.forEach(friend => {
+                const div = document.createElement('div');
+                div.className = 'friend-item';
+                div.innerHTML = `<div class="font-bold">${friend.email || friend.uid}</div>`;
+                div.onclick = () => openChat(friend.uid);
+                friendsList.appendChild(div);
+            });
+        }
+        
+        async function openChat(friendUid) {
+            currentChatId = [currentUser.uid, friendUid].sort().join('_');
+            closeFriends();
+            
+            const friend = friends.find(f => f.uid === friendUid);
+            document.getElementById('chatTitle').textContent = friend?.email || friendUid;
+            
+            if (messagesUnsubscribe) {
+                messagesUnsubscribe();
+            }
+            
+            const messagesRef = collection(db, 'chats', currentChatId, 'messages');
+            const q = query(messagesRef, orderBy('timestamp', 'asc'));
+            
+            messagesUnsubscribe = onSnapshot(q, (snapshot) => {
+                const messagesDiv = document.getElementById('messages');
+                messagesDiv.innerHTML = '';
+                
+                snapshot.forEach((doc) => {
+                    const msg = doc.data();
+                    renderMessage(msg);
+                });
+                
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            });
+        }
+        
+        function renderMessage(msg) {
+            const messagesDiv = document.getElementById('messages');
+            const bubble = document.createElement('div');
+            bubble.className = `chat-bubble ${msg.sender === currentUser.uid ? 'sent' : 'received'}`;
+            
+            if (msg.type === 'image') {
+                const img = document.createElement('img');
+                img.src = msg.content;
+                img.className = 'chat-image';
+                
+                // Fix 2: Event-Listener programmatisch hinzufügen statt inline onclick
+                img.addEventListener('click', () => {
+                    viewImage(msg.timestamp, msg.content);
+                });
+                
+                bubble.appendChild(img);
+            } else {
+                bubble.textContent = msg.content;
+            }
+            
+            messagesDiv.appendChild(bubble);
+        }
+        
+        // Global functions
+        window.login = async function() {
+            const email = document.getElementById('emailInput').value;
+            const password = document.getElementById('passwordInput').value;
+            
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                showToast('Erfolgreich angemeldet!', 'success');
+            } catch (error) {
+                console.error('Login Fehler:', error);
+                showToast('Anmeldung fehlgeschlagen', 'error');
+            }
+        };
+        
+        window.register = async function() {
+            const email = document.getElementById('emailInput').value;
+            const password = document.getElementById('passwordInput').value;
+            
+            try {
+                await createUserWithEmailAndPassword(auth, email, password);
+                showToast('Erfolgreich registriert!', 'success');
+            } catch (error) {
+                console.error('Registrierung Fehler:', error);
+                showToast('Registrierung fehlgeschlagen', 'error');
+            }
+        };
+        
+        window.logout = async function() {
+            try {
+                await signOut(auth);
+                showToast('Erfolgreich abgemeldet', 'success');
+            } catch (error) {
+                console.error('Logout Fehler:', error);
+                showToast('Abmeldung fehlgeschlagen', 'error');
+            }
+        };
+        
+        window.sendMessage = async function() {
+            const input = document.getElementById('messageInput');
+            const content = input.value.trim();
+            
+            if (!content || !currentChatId) return;
+            
+            try {
+                await addDoc(collection(db, 'chats', currentChatId, 'messages'), {
+                    content: content,
+                    sender: currentUser.uid,
+                    timestamp: Date.now(),
+                    type: 'text'
+                });
+                
+                input.value = '';
+            } catch (error) {
+                console.error('Fehler beim Senden:', error);
+                showToast('Nachricht konnte nicht gesendet werden', 'error');
+            }
+        };
+        
+        // Image input handler
+        document.getElementById('imageInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file || !currentChatId) return;
+            
+            try {
+                const imageRef = storageRef(storage, `images/${Date.now()}_${file.name}`);
+                await uploadBytes(imageRef, file);
+                const url = await getDownloadURL(imageRef);
+                
+                await addDoc(collection(db, 'chats', currentChatId, 'messages'), {
+                    content: url,
+                    sender: currentUser.uid,
+                    timestamp: Date.now(),
+                    type: 'image'
+                });
+                
+                showToast('Bild gesendet!', 'success');
+            } catch (error) {
+                console.error('Fehler beim Hochladen:', error);
+                showToast('Bild konnte nicht gesendet werden', 'error');
+            }
+            
+            e.target.value = '';
+        });
+        
+        window.addFriend = async function() {
+            const fid = document.getElementById('friendIdInput').value.trim();
+            
+            if (!fid) {
+                showToast('Bitte gib eine Freund-ID ein', 'error');
+                return;
+            }
+            
+            // Fix 6: Duplikat-Freunde Validierung
+            if (friends.some(f => f.uid === fid)) {
+                showToast('Bereits befreundet!', 'error');
+                return;
+            }
+            
+            if (fid === currentUser.uid) {
+                showToast('Das bist du selbst!', 'error');
+                return;
+            }
+            
+            try {
+                const friendDoc = await getDoc(doc(db, 'users', fid));
+                
+                if (!friendDoc.exists()) {
+                    showToast('Benutzer nicht gefunden', 'error');
+                    return;
+                }
+                
+                const friendData = friendDoc.data();
+                
+                await updateDoc(doc(db, 'users', currentUser.uid), {
+                    friends: arrayUnion({ uid: fid, email: friendData.email })
+                });
+                
+                await loadFriends();
+                document.getElementById('friendIdInput').value = '';
+                showToast('Freund hinzugefügt!', 'success');
+            } catch (error) {
+                console.error('Fehler beim Hinzufügen:', error);
+                showToast('Freund konnte nicht hinzugefügt werden', 'error');
+            }
+        };
+        
+        window.viewImage = function(timestamp, content) {
+            document.getElementById('modalImage').src = content;
+            document.getElementById('imageModal').classList.add('show');
+        };
+        
+        window.closeImageModal = function() {
+            document.getElementById('imageModal').classList.remove('show');
+        };
+        
+        window.showSettings = function() {
+            document.getElementById('settingsModal').classList.add('show');
+        };
+        
+        window.closeSettings = function() {
+            document.getElementById('settingsModal').classList.remove('show');
+        };
+        
+        window.showFriends = function() {
+            document.getElementById('friendsModal').classList.add('show');
+        };
+        
+        window.closeFriends = function() {
+            document.getElementById('friendsModal').classList.remove('show');
+        };
+        
+        // Fix 1: localStorage Settings Merge-Logik
+        window.setTheme = function(t) {
+            document.body.classList.toggle('theme-dark', t === 'dark');
+            
+            // Bestehende Settings laden
+            const settings = JSON.parse(localStorage.getItem('pp_settings') || '{}');
+            // Nur theme aktualisieren
+            settings.theme = t;
+            // Zurück speichern
+            localStorage.setItem('pp_settings', JSON.stringify(settings));
+        };
+        
+        window.setFont = function(f) {
+            document.body.classList.remove('font-hand', 'font-elegant', 'font-big');
+            if (f !== 'default') {
+                document.body.classList.add('font-' + f);
+            }
+            
+            // Bestehende Settings laden
+            const settings = JSON.parse(localStorage.getItem('pp_settings') || '{}');
+            // Nur font aktualisieren
+            settings.font = f;
+            // Zurück speichern
+            localStorage.setItem('pp_settings', JSON.stringify(settings));
+        };
+        
+        function loadSettings() {
+            try {
+                const settings = JSON.parse(localStorage.getItem('pp_settings') || '{}');
+                
+                if (settings.theme) {
+                    document.body.classList.toggle('theme-dark', settings.theme === 'dark');
+                    document.getElementById('themeSelect').value = settings.theme;
+                }
+                
+                if (settings.font) {
+                    if (settings.font !== 'default') {
+                        document.body.classList.add('font-' + settings.font);
+                    }
+                    document.getElementById('fontSelect').value = settings.font;
+                }
+            } catch (error) {
+                console.error('Fehler beim Laden der Einstellungen:', error);
+            }
+        }
+        
+        window.showToast = function(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 10);
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    container.removeChild(toast);
+                }, 300);
+            }, 3000);
+        };
+        
+        // Enter key support
+        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        document.getElementById('passwordInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                login();
+            }
+        });
+        
+        document.getElementById('friendIdInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                addFriend();
+            }
+        });
+    </script>
+</body>
+</html>
