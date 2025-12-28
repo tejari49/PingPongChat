@@ -144,8 +144,8 @@
                 <div class="space-y-4">
                     <input type="email" id="emailInput" placeholder="E-Mail" class="w-full p-3 border rounded-lg">
                     <input type="password" id="passwordInput" placeholder="Passwort" class="w-full p-3 border rounded-lg">
-                    <button onclick="login()" class="w-full bg-blue-500 text-white p-3 rounded-lg font-bold">Anmelden</button>
-                    <button onclick="register()" class="w-full bg-green-500 text-white p-3 rounded-lg font-bold">Registrieren</button>
+                    <button id="loginBtn" class="w-full bg-blue-500 text-white p-3 rounded-lg font-bold">Anmelden</button>
+                    <button id="registerBtn" class="w-full bg-green-500 text-white p-3 rounded-lg font-bold">Registrieren</button>
                 </div>
             </div>
         </div>
@@ -157,9 +157,9 @@
                 <div class="flex items-center justify-between">
                     <h2 id="chatTitle" class="text-xl font-bold">Chat</h2>
                     <div class="flex gap-2">
-                        <button onclick="showSettings()" class="p-2 rounded-lg hover:bg-gray-100">⚙️</button>
-                        <button onclick="showFriends()" class="p-2 rounded-lg hover:bg-gray-100">👥</button>
-                        <button onclick="logout()" class="p-2 rounded-lg hover:bg-gray-100">🚪</button>
+                        <button id="settingsBtn" class="p-2 rounded-lg hover:bg-gray-100">⚙️</button>
+                        <button id="friendsBtn" class="p-2 rounded-lg hover:bg-gray-100">👥</button>
+                        <button id="logoutBtn" class="p-2 rounded-lg hover:bg-gray-100">🚪</button>
                     </div>
                 </div>
             </div>
@@ -173,8 +173,8 @@
                 <div class="flex gap-2">
                     <input type="text" id="messageInput" placeholder="Nachricht..." class="flex-1 p-3 border rounded-lg">
                     <input type="file" id="imageInput" accept="image/*" class="hidden">
-                    <button onclick="document.getElementById('imageInput').click()" class="p-3 bg-gray-200 rounded-lg">📷</button>
-                    <button onclick="sendMessage()" class="p-3 bg-blue-500 text-white rounded-lg font-bold">Senden</button>
+                    <button id="imageBtn" class="p-3 bg-gray-200 rounded-lg">📷</button>
+                    <button id="sendBtn" class="p-3 bg-blue-500 text-white rounded-lg font-bold">Senden</button>
                 </div>
             </div>
         </div>
@@ -187,7 +187,7 @@
                 <div class="space-y-4">
                     <div>
                         <label class="block mb-2 font-bold">Theme:</label>
-                        <select id="themeSelect" onchange="setTheme(this.value)" class="w-full p-2 border rounded">
+                        <select id="themeSelect" class="w-full p-2 border rounded">
                             <option value="light">Hell</option>
                             <option value="dark">Dunkel</option>
                         </select>
@@ -195,7 +195,7 @@
                     
                     <div>
                         <label class="block mb-2 font-bold">Schriftart:</label>
-                        <select id="fontSelect" onchange="setFont(this.value)" class="w-full p-2 border rounded">
+                        <select id="fontSelect" class="w-full p-2 border rounded">
                             <option value="default">Standard</option>
                             <option value="hand">Handschrift</option>
                             <option value="elegant">Elegant</option>
@@ -204,7 +204,7 @@
                     </div>
                 </div>
                 
-                <button onclick="closeSettings()" class="mt-6 w-full bg-blue-500 text-white p-3 rounded-lg font-bold">Schließen</button>
+                <button id="closeSettingsBtn" class="mt-6 w-full bg-blue-500 text-white p-3 rounded-lg font-bold">Schließen</button>
             </div>
         </div>
         
@@ -215,18 +215,18 @@
                 
                 <div class="mb-4">
                     <input type="text" id="friendIdInput" placeholder="Freund ID" class="w-full p-2 border rounded">
-                    <button onclick="addFriend()" class="mt-2 w-full bg-green-500 text-white p-2 rounded-lg font-bold">Hinzufügen</button>
+                    <button id="addFriendBtn" class="mt-2 w-full bg-green-500 text-white p-2 rounded-lg font-bold">Hinzufügen</button>
                 </div>
                 
                 <div id="friendsList" class="space-y-2 max-h-64 overflow-y-auto">
                 </div>
                 
-                <button onclick="closeFriends()" class="mt-6 w-full bg-blue-500 text-white p-3 rounded-lg font-bold">Schließen</button>
+                <button id="closeFriendsBtn" class="mt-6 w-full bg-blue-500 text-white p-3 rounded-lg font-bold">Schließen</button>
             </div>
         </div>
         
         <!-- Image Viewer Modal -->
-        <div id="imageModal" class="modal" onclick="closeImageModal()">
+        <div id="imageModal" class="modal">
             <img id="modalImage" src="" alt="Full Image">
         </div>
         
@@ -281,8 +281,13 @@
                 document.getElementById('chatScreen').classList.remove('hidden');
                 
                 // Fix 3: try/catch für loadUserProfile
-                await loadUserProfile();
-                await loadFriends();
+                try {
+                    await loadUserProfile();
+                    await loadFriends();
+                } catch (error) {
+                    console.error('Fehler beim Initialisieren:', error);
+                    showToast('Fehler beim Laden der Daten', 'error');
+                }
             } else {
                 currentUser = null;
                 window.currentUser = null;
@@ -624,6 +629,29 @@
             if (e.key === 'Enter') {
                 addFriend();
             }
+        });
+        
+        // Button event listeners (Fix 2: programmatically added)
+        document.getElementById('loginBtn').addEventListener('click', login);
+        document.getElementById('registerBtn').addEventListener('click', register);
+        document.getElementById('settingsBtn').addEventListener('click', showSettings);
+        document.getElementById('friendsBtn').addEventListener('click', showFriends);
+        document.getElementById('logoutBtn').addEventListener('click', logout);
+        document.getElementById('imageBtn').addEventListener('click', () => {
+            document.getElementById('imageInput').click();
+        });
+        document.getElementById('sendBtn').addEventListener('click', sendMessage);
+        document.getElementById('closeSettingsBtn').addEventListener('click', closeSettings);
+        document.getElementById('closeFriendsBtn').addEventListener('click', closeFriends);
+        document.getElementById('addFriendBtn').addEventListener('click', addFriend);
+        document.getElementById('imageModal').addEventListener('click', closeImageModal);
+        
+        // Settings select event listeners
+        document.getElementById('themeSelect').addEventListener('change', (e) => {
+            setTheme(e.target.value);
+        });
+        document.getElementById('fontSelect').addEventListener('change', (e) => {
+            setFont(e.target.value);
         });
     </script>
 </body>
