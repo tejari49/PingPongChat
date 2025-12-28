@@ -42,7 +42,8 @@ self.addEventListener('notificationclick', (event) => {
     console.log('Notification clicked');
     event.notification.close();
     
+    // Use origin to work with any deployment path
     event.waitUntil(
-        clients.openWindow('/')
+        clients.openWindow(self.location.origin)
     );
 });
