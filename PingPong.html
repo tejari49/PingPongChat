@@ -243,8 +243,17 @@
         import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
         
         // Firebase configuration
-        // IMPORTANT: Replace these placeholder values with your actual Firebase config
-        // Consider using environment variables or a secure configuration method in production
+        // ⚠️ WICHTIG: Ersetzen Sie diese Platzhalter mit Ihrer echten Firebase-Konfiguration!
+        // Die App funktioniert NICHT ohne gültige Firebase-Zugangsdaten.
+        // 
+        // So erhalten Sie die Konfiguration:
+        // 1. Gehen Sie zu https://console.firebase.google.com/
+        // 2. Erstellen Sie ein neues Projekt oder wählen Sie ein bestehendes aus
+        // 3. Gehen Sie zu Projekteinstellungen > Allgemein
+        // 4. Scrollen Sie zu "Ihre Apps" und klicken Sie auf "Web-App hinzufügen"
+        // 5. Kopieren Sie die firebaseConfig-Werte hierher
+        //
+        // Für Produktion: Verwenden Sie Umgebungsvariablen oder eine sichere Konfigurationsmethode
         const firebaseConfig = {
             apiKey: "YOUR_API_KEY",
             authDomain: "YOUR_AUTH_DOMAIN",
@@ -411,12 +420,38 @@
             const email = document.getElementById('emailInput').value;
             const password = document.getElementById('passwordInput').value;
             
+            // Input validation
+            if (!email || !password) {
+                showToast('Bitte E-Mail und Passwort eingeben', 'error');
+                return;
+            }
+            
             try {
                 await signInWithEmailAndPassword(auth, email, password);
                 showToast('Erfolgreich angemeldet!', 'success');
             } catch (error) {
                 console.error('Login Fehler:', error);
-                showToast('Anmeldung fehlgeschlagen', 'error');
+                
+                // Provide specific error messages
+                let errorMessage = 'Anmeldung fehlgeschlagen';
+                
+                if (error.code === 'auth/invalid-api-key' || error.code === 'auth/invalid-credential') {
+                    errorMessage = 'Firebase nicht konfiguriert. Bitte Firebase-Einstellungen prüfen.';
+                } else if (error.code === 'auth/user-not-found') {
+                    errorMessage = 'Benutzer nicht gefunden';
+                } else if (error.code === 'auth/wrong-password') {
+                    errorMessage = 'Falsches Passwort';
+                } else if (error.code === 'auth/invalid-email') {
+                    errorMessage = 'Ungültige E-Mail-Adresse';
+                } else if (error.code === 'auth/user-disabled') {
+                    errorMessage = 'Benutzer wurde deaktiviert';
+                } else if (error.code === 'auth/network-request-failed') {
+                    errorMessage = 'Netzwerkfehler. Bitte Verbindung prüfen.';
+                } else if (error.message) {
+                    errorMessage = `Fehler: ${error.message}`;
+                }
+                
+                showToast(errorMessage, 'error');
             }
         };
         
@@ -424,12 +459,41 @@
             const email = document.getElementById('emailInput').value;
             const password = document.getElementById('passwordInput').value;
             
+            // Input validation
+            if (!email || !password) {
+                showToast('Bitte E-Mail und Passwort eingeben', 'error');
+                return;
+            }
+            
+            if (password.length < 6) {
+                showToast('Passwort muss mindestens 6 Zeichen lang sein', 'error');
+                return;
+            }
+            
             try {
                 await createUserWithEmailAndPassword(auth, email, password);
                 showToast('Erfolgreich registriert!', 'success');
             } catch (error) {
                 console.error('Registrierung Fehler:', error);
-                showToast('Registrierung fehlgeschlagen', 'error');
+                
+                // Provide specific error messages
+                let errorMessage = 'Registrierung fehlgeschlagen';
+                
+                if (error.code === 'auth/invalid-api-key' || error.code === 'auth/invalid-credential') {
+                    errorMessage = 'Firebase nicht konfiguriert. Bitte Firebase-Einstellungen prüfen.';
+                } else if (error.code === 'auth/email-already-in-use') {
+                    errorMessage = 'E-Mail bereits registriert';
+                } else if (error.code === 'auth/invalid-email') {
+                    errorMessage = 'Ungültige E-Mail-Adresse';
+                } else if (error.code === 'auth/weak-password') {
+                    errorMessage = 'Passwort zu schwach';
+                } else if (error.code === 'auth/network-request-failed') {
+                    errorMessage = 'Netzwerkfehler. Bitte Verbindung prüfen.';
+                } else if (error.message) {
+                    errorMessage = `Fehler: ${error.message}`;
+                }
+                
+                showToast(errorMessage, 'error');
             }
         };
         
