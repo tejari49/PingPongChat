@@ -140,6 +140,139 @@
             padding-bottom: env(safe-area-inset-bottom, 0px);
         }
 
+        /* Emoji Picker */
+        .emoji-picker {
+            position: absolute;
+            bottom: 70px;
+            left: 10px;
+            right: 10px;
+            background: var(--card-bg);
+            border: 2px solid var(--card-border);
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.2);
+            z-index: 40;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        
+        .emoji-category {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .emoji-btn {
+            font-size: 1.5rem;
+            padding: 8px;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: transform 0.1s;
+            text-align: center;
+        }
+        
+        .emoji-btn:hover {
+            transform: scale(1.2);
+            background: var(--input-bg);
+        }
+
+        /* Message Actions Menu */
+        .message-actions {
+            position: absolute;
+            top: -35px;
+            right: 0;
+            background: var(--card-bg);
+            border: 2px solid var(--card-border);
+            border-radius: 10px;
+            padding: 5px;
+            display: flex;
+            gap: 5px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+            z-index: 45;
+        }
+
+        .action-btn {
+            padding: 5px 10px;
+            font-size: 0.85rem;
+            border-radius: 5px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        /* Search UI */
+        .search-container {
+            padding: 10px;
+            background: var(--card-bg);
+            border-bottom: 2px solid var(--card-border);
+        }
+
+        .search-highlight {
+            background-color: yellow;
+            font-weight: bold;
+        }
+
+        /* Avatar styles */
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--card-border);
+        }
+
+        .avatar-small {
+            width: 25px;
+            height: 25px;
+        }
+
+        /* Read status checkmarks */
+        .read-status {
+            font-size: 0.7rem;
+            margin-left: 4px;
+        }
+
+        /* Typing indicator */
+        .typing-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent);
+            animation: typing-bounce 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing-bounce {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-8px); }
+        }
+
+        /* Background themes */
+        body.bg-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        body.bg-ocean {
+            background: linear-gradient(135deg, #2e3192 0%, #1bffff 100%);
+        }
+
+        body.bg-sunset {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        body.bg-forest {
+            background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+        }
+
         .hidden { display: none !important; }
     </style>
 </head>
@@ -147,6 +280,19 @@
 
     <!-- Toast -->
     <div id="toast-container" class="fixed top-5 left-1/2 -translate-x-1/2 z-[150] pointer-events-none w-full max-w-xs flex flex-col items-center gap-2"></div>
+
+    <!-- Notification Banner -->
+    <div id="notification-banner" class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-[140] w-full max-w-md">
+        <div class="bg-blue-500 text-white p-4 rounded-lg shadow-lg mx-4 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <i class="fas fa-bell"></i>
+                <span id="banner-text">Kalender Aktuell</span>
+            </div>
+            <button id="btn-close-banner" class="text-white opacity-70 hover:opacity-100">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
 
     <!-- Media Fullscreen Viewer -->
     <div id="media-viewer" class="hidden fixed inset-0 z-[200] bg-black flex items-center justify-center">
@@ -244,10 +390,19 @@
             <div class="paper-card p-6 rounded-2xl shadow-lg flex-1 scroller">
                 <div class="mb-8 border-b border-[var(--card-border)] pb-6">
                     <h3 class="font-bold opacity-60 mb-3 uppercase text-sm">Profil</h3>
-                    <div class="flex gap-2">
-                        <input id="settings-name" type="text" class="input-hand rounded-lg" placeholder="Dein Name">
-                        <button id="btn-save-name" class="bg-green-500 text-white px-4 rounded-lg btn-hand font-bold">OK</button>
+                    <div class="flex items-center gap-4 mb-3">
+                        <div class="relative">
+                            <img id="profile-avatar-display" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23d1d5db'/%3E%3Ctext x='50' y='50' text-anchor='middle' dy='.3em' font-size='40' fill='white'%3E👤%3C/text%3E%3C/svg%3E" class="avatar">
+                            <input type="file" id="avatar-input" accept="image/*" class="hidden">
+                            <button id="btn-upload-avatar" class="absolute bottom-0 right-0 bg-blue-500 text-white rounded-full w-6 h-6 text-xs flex items-center justify-center">
+                                <i class="fas fa-camera"></i>
+                            </button>
+                        </div>
+                        <div class="flex-1">
+                            <input id="settings-name" type="text" class="input-hand rounded-lg" placeholder="Dein Name">
+                        </div>
                     </div>
+                    <button id="btn-save-name" class="bg-green-500 text-white px-4 py-2 rounded-lg btn-hand font-bold w-full">Profil Speichern</button>
                 </div>
                 <div class="mb-8 border-b border-[var(--card-border)] pb-6">
                     <h3 class="font-bold opacity-60 mb-3 uppercase text-sm">Design</h3>
@@ -261,6 +416,23 @@
                         <button id="btn-font-big" class="w-full text-left p-3 border-2 rounded-xl font-sans font-bold">Aa Groß</button>
                     </div>
                 </div>
+                <div class="mb-8 border-b border-[var(--card-border)] pb-6">
+                    <h3 class="font-bold opacity-60 mb-3 uppercase text-sm">Chat-Hintergrund</h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="btn-bg-default" class="p-4 border-2 rounded-xl bg-[#f8f5f2] font-bold">Standard</button>
+                        <button id="btn-bg-gradient" class="p-4 border-2 rounded-xl bg-gradient-to-br from-purple-400 to-purple-600 text-white font-bold">Gradient</button>
+                        <button id="btn-bg-ocean" class="p-4 border-2 rounded-xl bg-gradient-to-br from-blue-900 to-cyan-400 text-white font-bold">Ocean</button>
+                        <button id="btn-bg-sunset" class="p-4 border-2 rounded-xl bg-gradient-to-br from-pink-400 to-red-400 text-white font-bold">Sunset</button>
+                        <button id="btn-bg-forest" class="p-4 border-2 rounded-xl bg-gradient-to-br from-gray-900 to-teal-700 text-white font-bold">Forest</button>
+                    </div>
+                </div>
+                <div class="mb-8 border-b border-[var(--card-border)] pb-6">
+                    <h3 class="font-bold opacity-60 mb-3 uppercase text-sm">Benachrichtigungen</h3>
+                    <button id="btn-enable-notifications" class="w-full p-4 border-2 rounded-xl font-bold bg-blue-50 hover:bg-blue-100">
+                        <i class="fas fa-bell mr-2"></i>Push-Benachrichtigungen aktivieren
+                    </button>
+                    <p class="text-xs opacity-60 mt-2">Erhalte Benachrichtigungen für neue Nachrichten</p>
+                </div>
                 <button id="btn-logout" class="w-full py-4 text-red-500 border-2 border-red-200 rounded-xl font-bold"><i class="fas fa-sign-out-alt"></i> Logout</button>
             </div>
         </div>
@@ -271,12 +443,27 @@
         <!-- Header -->
         <header class="paper-card p-3 border-b border-gray-200 flex items-center justify-between shadow-sm z-20 shrink-0">
             <button id="btn-back-from-chat" class="opacity-70 p-2 rounded-full w-10 h-10 flex items-center justify-center"><i class="fas fa-arrow-left text-xl"></i></button>
-            <div class="text-center">
-                <h3 id="chat-partner-name" class="font-bold text-2xl leading-none">Chat</h3>
+            <div class="text-center flex-1">
+                <div class="flex items-center justify-center gap-2">
+                    <img id="chat-partner-avatar" src="" class="avatar-small hidden">
+                    <h3 id="chat-partner-name" class="font-bold text-2xl leading-none">Chat</h3>
+                </div>
                 <span id="chat-status" class="text-xs opacity-50 font-bold uppercase">...</span>
             </div>
-            <div class="w-10"></div>
+            <button id="btn-search-toggle" class="opacity-70 p-2 rounded-full w-10 h-10 flex items-center justify-center">
+                <i class="fas fa-search text-xl"></i>
+            </button>
         </header>
+
+        <!-- Search Bar -->
+        <div id="search-bar" class="hidden search-container shrink-0">
+            <div class="flex gap-2 items-center">
+                <input id="search-input" type="text" placeholder="Nachrichten durchsuchen..." class="flex-1 input-hand rounded-lg px-3 py-2 text-sm">
+                <button id="btn-close-search" class="text-gray-500 p-2">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
 
         <!-- Messages Area (Flex-1 füllt den Platz) -->
         <div id="messages-container" class="flex-1 scroller p-4 space-y-4"></div>
@@ -284,6 +471,12 @@
         <!-- Locked Overlay -->
         <div id="locked-overlay" class="hidden absolute bottom-24 left-4 right-4 bg-red-50 dark:bg-red-900 border-2 border-red-200 rounded-xl p-3 text-center shadow-lg z-20 transform -rotate-1">
             <div class="font-bold text-red-800 dark:text-red-200"><i class="fas fa-hand-paper mr-2"></i>Warte auf Antwort!</div>
+        </div>
+
+        <!-- Emoji Picker -->
+        <div id="emoji-picker" class="hidden emoji-picker">
+            <div class="text-xs font-bold opacity-60 mb-2 uppercase">Emojis wählen</div>
+            <div class="emoji-category" id="emoji-grid"></div>
         </div>
 
         <!-- Input Area (Fixed Bottom logic via flexbox) -->
@@ -301,6 +494,11 @@
                     <i class="fas fa-microphone"></i>
                 </button>
 
+                <!-- Emoji Button -->
+                <button type="button" id="btn-emoji" class="text-gray-500 hover:text-yellow-500 p-2 text-xl transition-colors">
+                    <i class="fas fa-smile"></i>
+                </button>
+
                 <input id="message-input" type="text" placeholder="Nachricht..." class="flex-1 input-hand rounded-full px-4 border-2 bg-[var(--input-bg)]">
                 
                 <button id="send-btn" type="submit" class="bg-green-500 text-white rounded-full w-12 h-12 flex items-center justify-center text-xl shadow-md btn-hand disabled:bg-gray-400">
@@ -315,6 +513,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, arrayUnion, serverTimestamp, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref as storageRef, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyA1w6g0--2ibzug9MDwImxbxNRtB_Y_FXQ",
@@ -329,12 +528,19 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+        const storage = getStorage(app);
 
         // State
         let currentUser = null, userProfile = null, friends = [], currentChatId = null, unsubscribeChat = null;
         let mediaRecorder = null, audioChunks = [];
         let isRecording = false;
         let currentMessages = [];
+        let typingTimeout = null;
+        let currentPartnerUid = null;
+        let searchActive = false;
+
+        // Emoji list
+        const emojis = ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩','😘','😗','😚','😙','🥲','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🤐','🤨','😐','😑','😶','😶‍🌫️','😏','😒','🙄','😬','😮‍💨','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🤧','🥵','🥶','🥴','😵','😵‍💫','🤯','🤠','🥳','🥸','😎','🤓','🧐','😕','😟','🙁','☹️','😮','😯','😲','😳','🥺','😦','😧','😨','😰','😥','😢','😭','😱','😖','😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','☠️','💩','🤡','👹','👺','👻','👽','👾','🤖','😺','😸','😹','😻','😼','😽','🙀','😿','😾','🙈','🙉','🙊','💋','💌','💘','💝','💖','💗','💓','💞','💕','💟','❣️','💔','❤️‍🔥','❤️‍🩹','❤️','🧡','💛','💚','💙','💜','🤎','🖤','🤍','💯','💢','💥','💫','💦','💨','🕳️','💣','💬','👁️‍🗨️','🗨️','🗯️','💭','💤','👋','🤚','🖐️','✋','🖖','👌','🤌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✍️','💅','🤳','💪','🦾','🦿','🦵','🦶','👂','🦻','👃','🧠','🫀','🫁','🦷','🦴','👀','👁️','👅','👄','🫦','👶','🧒','👦','👧','🧑','👱','👨','🧔','🧔‍♂️','🧔‍♀️','👨‍🦰','👨‍🦱','👨‍🦳','👨‍🦲','👩','👩‍🦰','🧑‍🦰','👩‍🦱','🧑‍🦱','👩‍🦳','🧑‍🦳','👩‍🦲','🧑‍🦲','👱‍♀️','👱‍♂️','🧓','👴','👵','🙍','🙍‍♂️','🙍‍♀️','🙎','🙎‍♂️','🙎‍♀️','🙅','🙅‍♂️','🙅‍♀️','🙆','🙆‍♂️','🙆‍♀️','💁','💁‍♂️','💁‍♀️','🙋','🙋‍♂️','🙋‍♀️','🧏','🧏‍♂️','🧏‍♀️','🙇','🙇‍♂️','🙇‍♀️','🤦','🤦‍♂️','🤦‍♀️','🤷','🤷‍♂️','🤷‍♀️','🎉','🎊','🎈','🎁','🎀','🏆','🥇','🥈','🥉','⚽','⚾','🥎','🏀','🏐','🏈','🏉','🎾','🥏','🎳','🏏','🏑','🏒','🥍','🏓','🏸','🥊','🥋','🥅','⛳','⛸️','🎣','🤿','🎽','🎿','🛷','🥌','🎯','🪀','🪁','🎱','🔮','🪄','🧿','🎮','🕹️','🎰','🎲','🧩','🧸','🪅','🪆','♠️','♥️','♦️','♣️','♟️','🃏','🀄','🎴','🎭','🖼️','🎨','🧵','🪢','🧶','🪡'];
 
         // Init - Fix 1: Error handling for localStorage
         function loadLocalSettings() {
@@ -345,11 +551,337 @@
                     document.body.classList.remove('font-hand', 'font-elegant', 'font-big');
                     document.body.classList.add('font-' + s.font);
                 }
+                if(s.background && s.background !== 'default') {
+                    document.body.classList.add('bg-' + s.background);
+                }
             } catch(e) {
                 console.error('Settings load error:', e);
             }
         }
         loadLocalSettings();
+
+        // --- EMOJI PICKER ---
+        function initEmojiPicker() {
+            const grid = document.getElementById('emoji-grid');
+            grid.innerHTML = '';
+            emojis.forEach(emoji => {
+                const btn = document.createElement('button');
+                btn.className = 'emoji-btn';
+                btn.textContent = emoji;
+                btn.type = 'button';
+                btn.addEventListener('click', () => {
+                    const input = document.getElementById('message-input');
+                    input.value += emoji;
+                    input.focus();
+                    toggleEmojiPicker();
+                });
+                grid.appendChild(btn);
+            });
+        }
+
+        function toggleEmojiPicker() {
+            const picker = document.getElementById('emoji-picker');
+            picker.classList.toggle('hidden');
+        }
+
+        // --- TYPING INDICATOR ---
+        function handleTyping() {
+            if (!currentChatId || !currentPartnerUid) return;
+            
+            // Clear existing timeout
+            if (typingTimeout) clearTimeout(typingTimeout);
+            
+            // Set typing state in Firebase
+            updateTypingState(true);
+            
+            // Clear after 3 seconds
+            typingTimeout = setTimeout(() => {
+                updateTypingState(false);
+            }, 3000);
+        }
+
+        async function updateTypingState(isTyping) {
+            if (!currentChatId) return;
+            try {
+                const docRef = doc(db, 'chats', currentChatId);
+                const typingKey = `typing_${currentUser.uid}`;
+                await updateDoc(docRef, { 
+                    [typingKey]: isTyping ? Date.now() : null 
+                });
+            } catch(e) {
+                // Document might not exist yet
+                console.log('Typing state update skipped:', e.message);
+            }
+        }
+
+        function displayTypingIndicator(chatData) {
+            if (!currentPartnerUid) return;
+            const typingKey = `typing_${currentPartnerUid}`;
+            const partnerTyping = chatData[typingKey];
+            const statusEl = document.getElementById('chat-status');
+            
+            if (partnerTyping && (Date.now() - partnerTyping) < 5000) {
+                statusEl.innerHTML = '<span class="typing-indicator"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></span> tippt gerade...';
+            } else {
+                // Will be updated by updateTurn
+            }
+        }
+
+        // --- MESSAGE SEARCH ---
+        function toggleSearch() {
+            const searchBar = document.getElementById('search-bar');
+            const searchInput = document.getElementById('search-input');
+            searchActive = !searchActive;
+            
+            if (searchActive) {
+                searchBar.classList.remove('hidden');
+                searchInput.focus();
+            } else {
+                searchBar.classList.add('hidden');
+                searchInput.value = '';
+                renderMessages(currentMessages); // Re-render without highlights
+            }
+        }
+
+        function searchMessages() {
+            const query = document.getElementById('search-input').value.trim().toLowerCase();
+            if (!query) {
+                renderMessages(currentMessages);
+                return;
+            }
+            
+            const filteredMessages = currentMessages.filter(msg => {
+                if (msg.type === 'text' && msg.text) {
+                    return msg.text.toLowerCase().includes(query);
+                }
+                return false;
+            });
+            
+            renderMessages(filteredMessages, query);
+        }
+
+        // --- PROFILE AVATAR ---
+        async function handleAvatarUpload(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                const base64 = await resizeImage(file);
+                
+                try {
+                    // Upload to Firebase Storage
+                    const avatarRef = storageRef(storage, `avatars/${currentUser.uid}`);
+                    await uploadString(avatarRef, base64, 'data_url');
+                    const avatarURL = await getDownloadURL(avatarRef);
+                    
+                    // Update user profile
+                    await updateDoc(doc(db, 'users', currentUser.uid), { avatar: avatarURL });
+                    userProfile.avatar = avatarURL;
+                    
+                    // Update display
+                    document.getElementById('profile-avatar-display').src = avatarURL;
+                    showToast('Profilbild aktualisiert!', 'success');
+                } catch(e) {
+                    console.error('Avatar upload error:', e);
+                    showToast('Fehler beim Hochladen', 'error');
+                }
+                
+                input.value = '';
+            }
+        }
+
+        // --- BACKGROUND THEMES ---
+        function setBackground(bg) {
+            document.body.classList.remove('bg-gradient', 'bg-ocean', 'bg-sunset', 'bg-forest');
+            if (bg !== 'default') {
+                document.body.classList.add('bg-' + bg);
+            }
+            try {
+                const settings = JSON.parse(localStorage.getItem('pp_settings') || '{}');
+                settings.background = bg;
+                localStorage.setItem('pp_settings', JSON.stringify(settings));
+            } catch(e) {
+                console.error('Settings save error:', e);
+            }
+        }
+
+        // --- PUSH NOTIFICATIONS ---
+        async function requestNotificationPermission() {
+            if (!('Notification' in window)) {
+                showToast('Benachrichtigungen nicht unterstützt', 'error');
+                return;
+            }
+            
+            if (Notification.permission === 'granted') {
+                showToast('Benachrichtigungen bereits aktiviert', 'success');
+                showNotificationBanner();
+                await registerServiceWorker();
+                return;
+            }
+            
+            if (Notification.permission === 'denied') {
+                showToast('Benachrichtigungen wurden blockiert', 'error');
+                return;
+            }
+            
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                showToast('Benachrichtigungen aktiviert!', 'success');
+                showNotificationBanner();
+                await registerServiceWorker();
+            } else {
+                showToast('Benachrichtigungen abgelehnt', 'error');
+            }
+        }
+
+        async function registerServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                try {
+                    // Check if service worker exists, if not create a simple one
+                    const registration = await navigator.serviceWorker.register('/sw.js').catch(() => null);
+                    if (registration) {
+                        console.log('Service Worker registered');
+                    }
+                } catch(e) {
+                    console.log('Service Worker registration not available:', e.message);
+                }
+            }
+        }
+
+        function showNotificationBanner() {
+            const banner = document.getElementById('notification-banner');
+            banner.classList.remove('hidden');
+            setTimeout(() => {
+                banner.classList.add('hidden');
+            }, 5000);
+        }
+
+        function sendNotification(title, body) {
+            if (Notification.permission === 'granted' && document.hidden) {
+                new Notification(title, {
+                    body: body,
+                    icon: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ctext y="75" font-size="75"%3E📬%3C/text%3E%3C/svg%3E',
+                    badge: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ctext y="75" font-size="75"%3E📬%3C/text%3E%3C/svg%3E'
+                });
+            }
+        }
+
+        // --- MESSAGE EDIT/DELETE ---
+        function showMessageActions(msgTimestamp, msgElement) {
+            // Remove any existing action menus
+            document.querySelectorAll('.message-actions').forEach(m => m.remove());
+            
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'message-actions';
+            
+            const editBtn = document.createElement('button');
+            editBtn.className = 'action-btn bg-blue-100 hover:bg-blue-200';
+            editBtn.innerHTML = '<i class="fas fa-edit"></i> Bearbeiten';
+            editBtn.addEventListener('click', () => editMessage(msgTimestamp));
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'action-btn bg-red-100 hover:bg-red-200';
+            deleteBtn.innerHTML = '<i class="fas fa-trash"></i> Löschen';
+            deleteBtn.addEventListener('click', () => deleteMessage(msgTimestamp));
+            
+            actionsDiv.appendChild(editBtn);
+            actionsDiv.appendChild(deleteBtn);
+            
+            msgElement.style.position = 'relative';
+            msgElement.appendChild(actionsDiv);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => actionsDiv.remove(), 5000);
+        }
+
+        async function editMessage(timestamp) {
+            const newText = prompt('Nachricht bearbeiten:');
+            if (!newText || !newText.trim()) return;
+            
+            if (!currentChatId) return;
+            try {
+                const docRef = doc(db, 'chats', currentChatId);
+                const snap = await getDoc(docRef);
+                if (snap.exists()) {
+                    let messages = snap.data().messages;
+                    messages = messages.map(m => {
+                        if (m.timestamp == timestamp && m.senderId === currentUser.uid) {
+                            return { ...m, text: newText.trim(), edited: true };
+                        }
+                        return m;
+                    });
+                    await updateDoc(docRef, { messages: messages });
+                    showToast('Nachricht bearbeitet', 'success');
+                }
+            } catch(e) {
+                console.error('Edit failed', e);
+                showToast('Fehler beim Bearbeiten', 'error');
+            }
+            
+            // Remove action menu
+            document.querySelectorAll('.message-actions').forEach(m => m.remove());
+        }
+
+        async function deleteMessage(timestamp) {
+            if (!confirm('Nachricht wirklich löschen?')) return;
+            
+            if (!currentChatId) return;
+            try {
+                const docRef = doc(db, 'chats', currentChatId);
+                const snap = await getDoc(docRef);
+                if (snap.exists()) {
+                    let messages = snap.data().messages;
+                    messages = messages.map(m => {
+                        if (m.timestamp == timestamp && m.senderId === currentUser.uid) {
+                            return { ...m, type: 'deleted', text: '🗑️ Nachricht gelöscht', content: null };
+                        }
+                        return m;
+                    });
+                    await updateDoc(docRef, { messages: messages });
+                    showToast('Nachricht gelöscht', 'success');
+                }
+            } catch(e) {
+                console.error('Delete failed', e);
+                showToast('Fehler beim Löschen', 'error');
+            }
+            
+            // Remove action menu
+            document.querySelectorAll('.message-actions').forEach(m => m.remove());
+        }
+
+        // --- READ STATUS ---
+        async function markMessagesAsRead() {
+            if (!currentChatId) return;
+            try {
+                const docRef = doc(db, 'chats', currentChatId);
+                const snap = await getDoc(docRef);
+                if (snap.exists()) {
+                    let messages = snap.data().messages;
+                    let updated = false;
+                    messages = messages.map(m => {
+                        if (m.senderId !== currentUser.uid && !m.read) {
+                            updated = true;
+                            return { ...m, read: true, readAt: Date.now() };
+                        }
+                        return m;
+                    });
+                    if (updated) {
+                        await updateDoc(docRef, { messages: messages });
+                    }
+                }
+            } catch(e) {
+                console.error('Mark as read failed', e);
+            }
+        }
+
+        function getReadStatusIcon(msg) {
+            if (msg.senderId !== currentUser.uid) return '';
+            
+            if (msg.read) {
+                return '<span class="read-status text-blue-500" title="Gelesen"><i class="fas fa-check-double"></i></span>';
+            } else if (msg.delivered !== false) {
+                return '<span class="read-status text-gray-400" title="Zugestellt"><i class="fas fa-check"></i></span>';
+            }
+            return '<span class="read-status text-gray-300" title="Gesendet"><i class="fas fa-check"></i></span>';
+        }
 
         // Fix 3: Error handling in auth state
         onAuthStateChanged(auth, async (u) => {
@@ -561,20 +1093,49 @@
         async function connectToChat(friendUid) {
             const roomID = [currentUser.uid, friendUid].sort().join('_');
             currentChatId = roomID;
+            currentPartnerUid = friendUid;
             document.getElementById('messages-container').innerHTML = '<div class="text-center opacity-50 mt-5">Lade...</div>';
 
+            // Load partner's avatar
+            try {
+                const partnerSnap = await getDoc(doc(db, 'users', friendUid));
+                if (partnerSnap.exists() && partnerSnap.data().avatar) {
+                    const avatarEl = document.getElementById('chat-partner-avatar');
+                    avatarEl.src = partnerSnap.data().avatar;
+                    avatarEl.classList.remove('hidden');
+                }
+            } catch(e) {
+                console.log('Could not load partner avatar:', e.message);
+            }
+
             unsubscribeChat = onSnapshot(doc(db, 'chats', roomID), (snap) => {
-                if(!snap.exists()) { renderMessages([]); updateTurn(null); }
+                if(!snap.exists()) { 
+                    renderMessages([]); 
+                    updateTurn(null); 
+                }
                 else {
                     const data = snap.data();
                     currentMessages = data.messages || []; 
                     renderMessages(currentMessages);
                     updateTurn(data.lastSenderId);
+                    displayTypingIndicator(data);
+                    
+                    // Mark messages as read
+                    markMessagesAsRead();
+                    
+                    // Send notification for new messages
+                    if (currentMessages.length > 0) {
+                        const lastMsg = currentMessages[currentMessages.length - 1];
+                        if (lastMsg.senderId !== currentUser.uid && document.hidden) {
+                            const partnerName = document.getElementById('chat-partner-name').textContent;
+                            sendNotification(`Neue Nachricht von ${partnerName}`, lastMsg.text || 'Medien');
+                        }
+                    }
                 }
             });
         }
 
-        function renderMessages(msgs) {
+        function renderMessages(msgs, searchQuery = null) {
             const c = document.getElementById('messages-container');
             c.innerHTML = '';
             if(!msgs.length) { c.innerHTML = '<div class="text-center opacity-50 mt-10">Start 🏓</div>'; return; }
@@ -585,13 +1146,48 @@
                 div.className = `flex w-full mb-3 ${isMe ? 'justify-end' : 'justify-start'}`;
                 
                 const bubble = document.createElement('div');
-                bubble.addEventListener('click', (e) => openReactionMenu(e, msg.timestamp));
+                
+                // For own messages, long press to edit/delete
+                if (isMe && msg.type === 'text') {
+                    let pressTimer;
+                    bubble.addEventListener('touchstart', (e) => {
+                        pressTimer = setTimeout(() => {
+                            showMessageActions(msg.timestamp, bubble);
+                        }, 500);
+                    });
+                    bubble.addEventListener('touchend', () => {
+                        clearTimeout(pressTimer);
+                    });
+                    bubble.addEventListener('mousedown', (e) => {
+                        if (e.button === 0) { // Left click
+                            pressTimer = setTimeout(() => {
+                                showMessageActions(msg.timestamp, bubble);
+                            }, 500);
+                        }
+                    });
+                    bubble.addEventListener('mouseup', () => {
+                        clearTimeout(pressTimer);
+                    });
+                }
+                
+                // Click to add reaction (for all messages)
+                bubble.addEventListener('click', (e) => {
+                    // Don't open reaction if clicking on action buttons
+                    if (!e.target.closest('.message-actions')) {
+                        openReactionMenu(e, msg.timestamp);
+                    }
+                });
+                
                 bubble.style.backgroundColor = isMe ? 'var(--bubble-me)' : 'var(--bubble-other)';
                 bubble.style.color = isMe && !document.body.classList.contains('theme-dark') ? '#065f46' : 'var(--text-color)';
                 bubble.className = `max-w-[85%] px-3 py-2 text-lg shadow-sm border-2 border-[var(--card-border)] relative cursor-pointer active:scale-95 transition-transform ${isMe ? 'rounded-2xl rounded-tr-none rotate-1' : 'rounded-2xl rounded-tl-none -rotate-1'}`;
 
                 if (msg.type === 'burned') {
                     bubble.innerHTML = `<div class="text-gray-400 italic text-sm"><i class="fas fa-bomb"></i> Inhalt verpufft</div>`;
+                    bubble.onclick = null;
+                }
+                else if (msg.type === 'deleted') {
+                    bubble.innerHTML = `<div class="text-gray-400 italic text-sm">${msg.text}</div>`;
                     bubble.onclick = null;
                 }
                 else if (msg.type === 'image') {
@@ -634,7 +1230,24 @@
                     }
                 }
                 else {
-                    bubble.textContent = msg.text || "";
+                    let textContent = msg.text || "";
+                    
+                    // Highlight search results
+                    if (searchQuery) {
+                        const regex = new RegExp(`(${searchQuery})`, 'gi');
+                        textContent = textContent.replace(regex, '<span class="search-highlight">$1</span>');
+                        bubble.innerHTML = textContent;
+                    } else {
+                        bubble.textContent = textContent;
+                    }
+                    
+                    // Show edited indicator
+                    if (msg.edited) {
+                        const editedSpan = document.createElement('span');
+                        editedSpan.className = 'text-xs opacity-50 ml-2';
+                        editedSpan.textContent = '(bearbeitet)';
+                        bubble.appendChild(editedSpan);
+                    }
                 }
 
                 if(msg.reaction) {
@@ -644,10 +1257,19 @@
                     bubble.appendChild(reactDiv);
                 }
 
-                const ts = document.createElement('div');
-                ts.className = "text-[10px] text-right mt-1 opacity-50";
+                const footer = document.createElement('div');
+                footer.className = "flex items-center justify-end gap-1 text-[10px] mt-1 opacity-50";
+                
+                const ts = document.createElement('span');
                 ts.textContent = new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-                bubble.appendChild(ts);
+                footer.appendChild(ts);
+                
+                // Add read status for own messages
+                if (isMe) {
+                    footer.innerHTML += getReadStatusIcon(msg);
+                }
+                
+                bubble.appendChild(footer);
 
                 div.appendChild(bubble);
                 c.appendChild(div);
@@ -694,7 +1316,10 @@
                 content: type === 'text' ? null : content,
                 senderId: currentUser.uid,
                 timestamp: Date.now(),
-                reaction: null 
+                reaction: null,
+                delivered: true,
+                read: false,
+                edited: false
             };
 
             try {
@@ -769,7 +1394,17 @@
         
         async function loadUserProfile(uid) {
             const snap = await getDoc(doc(db,'users',uid));
-            if(snap.exists()) { userProfile = snap.data(); friends = userProfile.friends||[]; renderFriends(); showDashboard(); }
+            if(snap.exists()) { 
+                userProfile = snap.data(); 
+                friends = userProfile.friends||[]; 
+                renderFriends(); 
+                showDashboard(); 
+                
+                // Load avatar if exists
+                if (userProfile.avatar) {
+                    document.getElementById('profile-avatar-display').src = userProfile.avatar;
+                }
+            }
         }
         
         function copyCode() { 
@@ -826,7 +1461,16 @@
         }
         function showChat(uid, n) { 
             hideAll('view-chat'); 
-            document.getElementById('chat-partner-name').textContent=n; 
+            document.getElementById('chat-partner-name').textContent=n;
+            // Reset avatar
+            const avatarEl = document.getElementById('chat-partner-avatar');
+            avatarEl.classList.add('hidden');
+            avatarEl.src = '';
+            // Close emoji picker if open
+            document.getElementById('emoji-picker').classList.add('hidden');
+            // Close search if open
+            document.getElementById('search-bar').classList.add('hidden');
+            searchActive = false;
             connectToChat(uid); 
         }
         function showSettings() { document.getElementById('view-settings').classList.remove('hidden'); }
@@ -893,6 +1537,36 @@
         document.getElementById('media-viewer').addEventListener('click', closeMediaViewer);
         document.getElementById('reaction-overlay').addEventListener('click', (e) => {
             if(e.target.id === 'reaction-overlay') closeReactionMenu();
+        });
+
+        // New event listeners
+        document.getElementById('btn-emoji').addEventListener('click', toggleEmojiPicker);
+        document.getElementById('btn-search-toggle').addEventListener('click', toggleSearch);
+        document.getElementById('btn-close-search').addEventListener('click', toggleSearch);
+        document.getElementById('search-input').addEventListener('input', searchMessages);
+        document.getElementById('btn-upload-avatar').addEventListener('click', () => document.getElementById('avatar-input').click());
+        document.getElementById('avatar-input').addEventListener('change', function() { handleAvatarUpload(this); });
+        document.getElementById('btn-bg-default').addEventListener('click', () => setBackground('default'));
+        document.getElementById('btn-bg-gradient').addEventListener('click', () => setBackground('gradient'));
+        document.getElementById('btn-bg-ocean').addEventListener('click', () => setBackground('ocean'));
+        document.getElementById('btn-bg-sunset').addEventListener('click', () => setBackground('sunset'));
+        document.getElementById('btn-bg-forest').addEventListener('click', () => setBackground('forest'));
+        document.getElementById('btn-enable-notifications').addEventListener('click', requestNotificationPermission);
+        document.getElementById('btn-close-banner').addEventListener('click', () => {
+            document.getElementById('notification-banner').classList.add('hidden');
+        });
+        document.getElementById('message-input').addEventListener('input', handleTyping);
+
+        // Initialize emoji picker
+        initEmojiPicker();
+
+        // Close emoji picker when clicking outside
+        document.addEventListener('click', (e) => {
+            const emojiPicker = document.getElementById('emoji-picker');
+            const emojiBtn = document.getElementById('btn-emoji');
+            if (!emojiPicker.contains(e.target) && e.target !== emojiBtn && !emojiBtn.contains(e.target)) {
+                emojiPicker.classList.add('hidden');
+            }
         });
 
     </script>
