@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <!-- WICHTIG: viewport-fit=cover und interactive-widget=resizes-content für stabile Keyboards auf Mobile -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+    <title>PingPong 📬</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        /* --- THEME VARIABLES --- */
+        :root {
+            --bg-color: #f8f5f2;
+            --bg-pattern: radial-gradient(#d1d5db 1px, transparent 1px);
+            --text-color: #1f2937;
+            --card-bg: #ffffff;
+            --card-border: #374151;
+            --bubble-me: #d1fae5;
+            --bubble-other: #ffffff;
+            --input-bg: #f3f4f6;
+            --accent: #10b981;
+        }
+
+        body.theme-dark {
+            --bg-color: #000000;
+            --bg-pattern: none;
+            --text-color: #e5e7eb;
+            --card-bg: #121212;
+            --card-border: #333333;
+            --bubble-me: #064e3b;
+            --bubble-other: #1f2937;
+            --input-bg: #1f2937;
+            --accent: #34d399;
+        }
+
+        body.font-hand { font-family: 'Patrick Hand', cursive; }
+        body.font-elegant { font-family: 'Playfair Display', serif; }
+        body.font-big { font-family: 'Poppins', sans-serif; font-size: 1.1rem; }
+
+        /* Layout Core: 100dvh for mobile browsers */
+        body {
+            background-color: var(--bg-color);
+            background-image: var(--bg-pattern);
+            background-size: 24px 24px;
+            color: var(--text-color);
+            height: 100dvh; /* Dynamic Height */
+            width: 100vw;
+            overflow: hidden; 
+            overscroll-behavior: none; /* Verhindert "Bounce" Effekt auf iOS */
+        }
+
+        /* UI Elements */
+        .paper-card {
+            background-color: var(--card-bg);
+            border: 2px solid var(--card-border);
+            color: var(--text-color);
+            transition: all 0.3s ease;
+        }
+        .hand-drawn-border { border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px; }
+        .btn-hand:active { transform: scale(0.95); }
+        .input-hand {
+            background: var(--input-bg);
+            border-bottom: 2px solid var(--card-border);
+            color: var(--text-color);
+            padding: 12px;
+            width: 100%;
+            outline: none;
+        }
+
+        /* Scroller */
+        .scroller { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+
+        /* Media Styles */
+        .blur-secret { filter: blur(12px); transition: filter 0.5s; cursor: pointer; }
+        .blur-secret:hover { filter: blur(8px); }
+        
+        /* Animations */
+        @keyframes bounce-slow {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+        .anim-emoji { display: inline-block; animation: bounce-slow 2s infinite ease-in-out; }
+        
+        @keyframes pulse-red {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .recording-active { animation: pulse-red 1.5s infinite; background-color: #ef4444 !important; color: white !important; border-color: #ef4444 !important; }
+
+        /* Reaction Overlay */
+        .reaction-menu {
+            position: absolute;
+            background: var(--card-bg);
+            border: 2px solid var(--card-border);
+            border-radius: 20px;
+            padding: 8px;
+            display: flex;
+            gap: 10px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            z-index: 50;
+            animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; }  }
+
+        .reaction-bubble {
+            position: absolute;
+            bottom: -10px;
+            right: -5px;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 2px 6px;
+            font-size: 0.8rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* Fix 4: Toast CSS-Styles */
+        .toast {
+            background: var(--card-bg);
+            border: 2px solid var(--card-border);
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-weight: bold;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.3s ease;
+            pointer-events: auto;
+        }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.error { background: #fee2e2; border-color: #ef4444; color: #991b1b; }
+        .toast.success { background: #d1fae5; border-color: #10b981; color: #065f46; }
+
+        /* Fix 5: pb-safe class */
+        .pb-safe {
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body class="font-hand">
+
+    <!-- Toast -->
+    <div id="toast-container" class="fixed top-5 left-1/2 -translate-x-1/2 z-[150] pointer-events-none w-full max-w-xs flex flex-col items-center gap-2"></div>
+
+    <!-- Media Fullscreen Viewer -->
+    <div id="media-viewer" class="hidden fixed inset-0 z-[200] bg-black flex items-center justify-center">
+        <img id="viewer-img" src="" class="max-w-full max-h-full object-contain pointer-events-none">
+        <div class="absolute bottom-10 text-white text-center opacity-70 animate-pulse bg-black/50 px-4 py-2 rounded-full">
+            Tippen zum Schließen & Zerstören 🔥
+        </div>
+    </div>
+
+    <!-- Reaction Picker Overlay -->
+    <div id="reaction-overlay" class="hidden fixed inset-0 z-[60] bg-black/20 flex items-center justify-center">
+        <!-- Menu gets injected via JS near the message -->
+    </div>
+
+    <!-- Loading -->
+    <div id="view-loading" class="absolute inset-0 z-[60] bg-[var(--bg-color)] flex items-center justify-center">
+        <div class="text-center animate-pulse text-[var(--text-color)]">
+            <div class="text-4xl">📬</div>
+            <div>Lade App...</div>
+        </div>
+    </div>
+
+    <!-- START SCREEN -->
+    <div id="view-start" class="hidden h-full flex flex-col items-center justify-center p-6 z-50 scroller">
+        <div class="paper-card p-8 max-w-sm w-full hand-drawn-border transform rotate-1">
+            <div class="text-center mb-8">
+                <div class="text-6xl mb-2">👋</div>
+                <h1 class="text-3xl font-bold">PingPong</h1>
+                <p class="opacity-60">Secret Messenger</p>
+            </div>
+            <button id="btn-show-register" class="w-full bg-green-500 text-white text-xl py-3 rounded-lg btn-hand font-bold mb-4">Konto erstellen ✨</button>
+            <button id="btn-show-login" class="w-full paper-card border-2 text-xl py-3 rounded-lg btn-hand font-bold">Anmelden 🔑</button>
+        </div>
+    </div>
+
+    <!-- REGISTER -->
+    <div id="view-register" class="hidden h-full flex flex-col items-center justify-center p-6 z-50 scroller">
+        <div class="paper-card p-8 max-w-sm w-full hand-drawn-border">
+            <h2 class="text-2xl font-bold mb-4 text-center">Registrieren</h2>
+            <div class="space-y-4">
+                <input id="reg-name" type="text" placeholder="Name" class="input-hand text-xl text-center">
+                <input id="reg-email" type="email" placeholder="E-Mail" class="input-hand text-xl text-center">
+                <input id="reg-pass" type="password" placeholder="Passwort (min 6)" class="input-hand text-xl text-center">
+                <button id="btn-do-register" class="w-full bg-green-500 text-white text-xl py-3 rounded-lg btn-hand font-bold mt-4">Los geht's 🚀</button>
+                <button id="btn-register-back" class="w-full opacity-60 mt-2">Zurück</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGIN -->
+    <div id="view-login" class="hidden h-full flex flex-col items-center justify-center p-6 z-50 scroller">
+        <div class="paper-card p-8 max-w-sm w-full hand-drawn-border transform -rotate-1">
+            <h2 class="text-2xl font-bold mb-4 text-center">Login</h2>
+            <div class="space-y-4">
+                <input id="login-email" type="email" placeholder="E-Mail" class="input-hand text-xl text-center">
+                <input id="login-pass" type="password" placeholder="Passwort" class="input-hand text-xl text-center">
+                <button id="btn-do-login" class="w-full bg-blue-500 text-white text-xl py-3 rounded-lg btn-hand font-bold mt-4">Einloggen 🔓</button>
+                <button id="btn-login-back" class="w-full opacity-60 mt-2">Zurück</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="view-dashboard" class="hidden h-full flex flex-col max-w-md mx-auto w-full bg-[var(--bg-color)]">
+        <!-- Dashboard ist jetzt flex-col mit 100dvh -->
+        <div class="paper-card p-4 pb-6 border-b-2 z-10 rounded-b-3xl shrink-0">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-3xl font-bold">Chats 📬</h2>
+                <button id="btn-show-settings" class="text-xl p-2"><i class="fas fa-cog"></i></button>
+            </div>
+            <div class="bg-yellow-50 dark:bg-yellow-900/30 p-4 rounded-xl border-2 border-dashed border-yellow-300 relative">
+                <p class="opacity-60 text-xs font-bold tracking-widest uppercase">Dein Freundes-Code:</p>
+                <div class="flex justify-between items-center mt-1">
+                    <span id="display-my-code" class="text-3xl font-bold font-mono tracking-wider">...</span>
+                    <button id="btn-copy-code" class="bg-yellow-200 text-yellow-900 px-3 py-1 rounded-lg text-sm font-bold btn-hand"><i class="fas fa-copy"></i></button>
+                </div>
+            </div>
+        </div>
+        <div id="friends-list" class="flex-1 scroller p-4 space-y-3"></div>
+        <div class="p-4 paper-card border-t-2 rounded-t-3xl shrink-0">
+            <form id="form-add-friend" class="flex gap-2">
+                <input id="friend-code-input" type="text" placeholder="Code (z.B. X9P2)..." class="flex-1 input-hand rounded-xl border-2 uppercase">
+                <button type="submit" class="bg-blue-500 text-white w-14 rounded-xl text-xl btn-hand"><i class="fas fa-plus"></i></button>
+            </form>
+        </div>
+    </div>
+
+    <!-- SETTINGS OVERLAY -->
+    <div id="view-settings" class="hidden fixed inset-0 z-[100] flex flex-col bg-[var(--bg-color)]">
+        <div class="w-full max-w-md mx-auto h-full flex flex-col p-4">
+            <div class="flex justify-between items-center mb-4 shrink-0">
+                <h2 class="text-3xl font-bold">Einstellungen</h2>
+                <button id="btn-close-settings" class="text-4xl font-bold leading-none">&times;</button>
+            </div>
+            <div class="paper-card p-6 rounded-2xl shadow-lg flex-1 scroller">
+                <div class="mb-8 border-b border-[var(--card-border)] pb-6">
+                    <h3 class="font-bold opacity-60 mb-3 uppercase text-sm">Profil</h3>
+                    <div class="flex gap-2">
+                        <input id="settings-name" type="text" class="input-hand rounded-lg" placeholder="Dein Name">
+                        <button id="btn-save-name" class="bg-green-500 text-white px-4 rounded-lg btn-hand font-bold">OK</button>
+                    </div>
+                </div>
+                <div class="mb-8 border-b border-[var(--card-border)] pb-6">
+                    <h3 class="font-bold opacity-60 mb-3 uppercase text-sm">Design</h3>
+                    <div class="grid grid-cols-2 gap-3 mb-6">
+                        <button id="btn-theme-light" class="p-4 border-2 rounded-xl bg-[#f8f5f2] text-gray-800 font-bold">☀️ Papier</button>
+                        <button id="btn-theme-dark" class="p-4 border-2 rounded-xl bg-black text-white font-bold">🌑 Dark</button>
+                    </div>
+                    <div class="space-y-3">
+                        <button id="btn-font-hand" class="w-full text-left p-3 border-2 rounded-xl">Aa Handschrift</button>
+                        <button id="btn-font-elegant" class="w-full text-left p-3 border-2 rounded-xl font-serif">Aa Elegant</button>
+                        <button id="btn-font-big" class="w-full text-left p-3 border-2 rounded-xl font-sans font-bold">Aa Groß</button>
+                    </div>
+                </div>
+                <button id="btn-logout" class="w-full py-4 text-red-500 border-2 border-red-200 rounded-xl font-bold"><i class="fas fa-sign-out-alt"></i> Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHAT ROOM (FLEXIBLE LAYOUT FIX) -->
+    <div id="view-chat" class="hidden h-full flex flex-col max-w-md mx-auto w-full bg-[var(--bg-color)]">
+        <!-- Header -->
+        <header class="paper-card p-3 border-b border-gray-200 flex items-center justify-between shadow-sm z-20 shrink-0">
+            <button id="btn-back-from-chat" class="opacity-70 p-2 rounded-full w-10 h-10 flex items-center justify-center"><i class="fas fa-arrow-left text-xl"></i></button>
+            <div class="text-center">
+                <h3 id="chat-partner-name" class="font-bold text-2xl leading-none">Chat</h3>
+                <span id="chat-status" class="text-xs opacity-50 font-bold uppercase">...</span>
+            </div>
+            <div class="w-10"></div>
+        </header>
+
+        <!-- Messages Area (Flex-1 füllt den Platz) -->
+        <div id="messages-container" class="flex-1 scroller p-4 space-y-4"></div>
+
+        <!-- Locked Overlay -->
+        <div id="locked-overlay" class="hidden absolute bottom-24 left-4 right-4 bg-red-50 dark:bg-red-900 border-2 border-red-200 rounded-xl p-3 text-center shadow-lg z-20 transform -rotate-1">
+            <div class="font-bold text-red-800 dark:text-red-200"><i class="fas fa-hand-paper mr-2"></i>Warte auf Antwort!</div>
+        </div>
+
+        <!-- Input Area (Fixed Bottom logic via flexbox) -->
+        <footer class="paper-card p-3 border-t shrink-0 relative z-30 pb-safe">
+            
+            <form id="form-send-message" class="flex gap-2 items-center">
+                <!-- Media Buttons -->
+                <input type="file" id="img-input" accept="image/*" class="hidden">
+                <button type="button" id="btn-cam" class="text-gray-500 hover:text-blue-500 p-2 text-xl transition-colors">
+                    <i class="fas fa-camera"></i>
+                </button>
+                
+                <!-- Toggle Recording Button -->
+                <button type="button" id="btn-mic" class="text-gray-500 hover:text-red-500 p-2 text-xl transition-all border-2 border-transparent rounded-full w-10 h-10 flex items-center justify-center">
+                    <i class="fas fa-microphone"></i>
+                </button>
+
+                <input id="message-input" type="text" placeholder="Nachricht..." class="flex-1 input-hand rounded-full px-4 border-2 bg-[var(--input-bg)]">
+                
+                <button id="send-btn" type="submit" class="bg-green-500 text-white rounded-full w-12 h-12 flex items-center justify-center text-xl shadow-md btn-hand disabled:bg-gray-400">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </form>
+        </footer>
+    </div>
+
+    <!-- Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, arrayUnion, serverTimestamp, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyA1w6g0--2ibzug9MDwImxbxNRtB_Y_FXQ",
+            authDomain: "ping-pong-rai.firebaseapp.com",
+            projectId: "ping-pong-rai",
+            storageBucket: "ping-pong-rai.firebasestorage.app",
+            messagingSenderId: "539560929734",
+            appId: "1:539560929734:web:e0dc5b881e01d469e8aac7",
+            measurementId: "G-6PQKDVJ5M1"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // State
+        let currentUser = null, userProfile = null, friends = [], currentChatId = null, unsubscribeChat = null;
+        let mediaRecorder = null, audioChunks = [];
+        let isRecording = false;
+        let currentMessages = [];
+
+        // Init - Fix 1: Error handling for localStorage
+        function loadLocalSettings() {
+            try {
+                const s = JSON.parse(localStorage.getItem('pp_settings') || '{}');
+                if(s.theme) document.body.classList.toggle('theme-dark', s.theme === 'dark');
+                if(s.font) {
+                    document.body.classList.remove('font-hand', 'font-elegant', 'font-big');
+                    document.body.classList.add('font-' + s.font);
+                }
+            } catch(e) {
+                console.error('Settings load error:', e);
+            }
+        }
+        loadLocalSettings();
+
+        // Fix 3: Error handling in auth state
+        onAuthStateChanged(auth, async (u) => {
+            document.getElementById('view-loading').classList.add('hidden');
+            if(u) { 
+                currentUser = u; 
+                try {
+                    await loadUserProfile(u.uid); 
+                } catch(e) {
+                    console.error('Profile load error:', e);
+                    showToast('Fehler beim Laden des Profils', 'error');
+                }
+            }
+            else { currentUser = null; showStart(); }
+        });
+
+        // --- MEDIA LOGIC (Images & Audio) ---
+
+        async function handleImageSelect(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                const base64 = await resizeImage(file); 
+                sendMessageInternal('image', base64);
+                input.value = '';
+            }
+        }
+
+        function resizeImage(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        const maxDim = 800; 
+                        let w = img.width, h = img.height;
+                        if (w > h) { if (w > maxDim) { h *= maxDim/w; w = maxDim; } }
+                        else { if (h > maxDim) { w *= maxDim/h; h = maxDim; } }
+                        canvas.width = w; canvas.height = h;
+                        ctx.drawImage(img, 0, 0, w, h);
+                        resolve(canvas.toDataURL('image/jpeg', 0.6));
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // --- TOGGLE RECORDING LOGIC ---
+        async function toggleRecording() {
+            const btn = document.getElementById('btn-mic');
+            const input = document.getElementById('message-input');
+
+            if (!isRecording) {
+                if(!navigator.mediaDevices) { showToast("Kein Mikrofon!", "error"); return; }
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                    
+                    mediaRecorder.onstop = async () => {
+                        const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                             sendMessageInternal('voice', reader.result);
+                        };
+                        reader.readAsDataURL(blob);
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+
+                    mediaRecorder.start();
+                    isRecording = true;
+                    btn.classList.add('recording-active');
+                    btn.innerHTML = '<i class="fas fa-stop"></i>';
+                    input.placeholder = "Aufnahme läuft... (Tippen zum Stoppen)";
+                    input.disabled = true;
+
+                } catch(e) { showToast("Mic Fehler: " + e.message, "error"); }
+            } else {
+                if(mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.stop();
+                    isRecording = false;
+                    btn.classList.remove('recording-active');
+                    btn.innerHTML = '<i class="fas fa-microphone"></i>';
+                    input.placeholder = "Nachricht...";
+                    input.disabled = false;
+                }
+            }
+        }
+
+        // --- REACTION SYSTEM ---
+
+        function openReactionMenu(event, msgTimestamp) {
+            event.stopPropagation();
+            
+            const overlay = document.getElementById('reaction-overlay');
+            const existingMenu = overlay.querySelector('.reaction-menu');
+            if(existingMenu) existingMenu.remove();
+
+            const menu = document.createElement('div');
+            menu.className = "reaction-menu";
+            
+            const emojis = ['❤️', '😂', '🔥', '😮', '👻'];
+            
+            emojis.forEach(emo => {
+                const btn = document.createElement('button');
+                btn.className = "text-2xl hover:scale-125 transition-transform anim-emoji";
+                btn.textContent = emo;
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    saveReaction(msgTimestamp, emo);
+                    closeReactionMenu();
+                });
+                menu.appendChild(btn);
+            });
+
+            const inputBtn = document.createElement('button');
+            inputBtn.className = "text-xl bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center hover:bg-gray-200";
+            inputBtn.innerHTML = '<i class="fas fa-plus"></i>';
+            inputBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const uInput = prompt("Tippe ein Emoji ein:");
+                if(uInput) saveReaction(msgTimestamp, uInput);
+                closeReactionMenu();
+            });
+            menu.appendChild(inputBtn);
+
+            if(window.innerWidth < 600) {
+                 menu.style.top = "40%";
+                 menu.style.left = "50%";
+                 menu.style.transform = "translate(-50%, -50%)";
+            } else {
+                 menu.style.top = event.clientY + "px";
+                 menu.style.left = event.clientX + "px";
+            }
+            
+            overlay.appendChild(menu);
+            overlay.classList.remove('hidden');
+        }
+
+        function closeReactionMenu() {
+            document.getElementById('reaction-overlay').classList.add('hidden');
+        }
+
+        async function saveReaction(msgTimestamp, emoji) {
+             if(!currentChatId) return;
+             try {
+                const docRef = doc(db, 'chats', currentChatId);
+                const snap = await getDoc(docRef);
+                if(snap.exists()) {
+                    let messages = snap.data().messages;
+                    messages = messages.map(m => {
+                        if(m.timestamp == msgTimestamp) {
+                            return { ...m, reaction: emoji };
+                        }
+                        return m;
+                    });
+                    await updateDoc(docRef, { messages: messages });
+                }
+             } catch(e) { console.error("Reaction failed", e); }
+        }
+
+        // --- SELF DESTRUCT LOGIC ---
+        
+        function viewImage(msgTimestamp, base64) {
+            const viewer = document.getElementById('media-viewer');
+            const img = document.getElementById('viewer-img');
+            img.src = base64;
+            viewer.classList.remove('hidden');
+            viewer.dataset.burnId = msgTimestamp;
+        }
+
+        function closeMediaViewer() {
+            const viewer = document.getElementById('media-viewer');
+            viewer.classList.add('hidden');
+            document.getElementById('viewer-img').src = "";
+            const ts = viewer.dataset.burnId;
+            if(ts) burnMessage(ts);
+        }
+
+        function handleAudioEnd(audioEl, msgTimestamp) {
+            burnMessage(msgTimestamp);
+            audioEl.parentElement.innerHTML = "<span class='text-xs italic'>Audio zerstört 🔥</span>";
+        }
+
+        async function burnMessage(timestamp) {
+            if(!currentChatId) return;
+            try {
+                const docRef = doc(db, 'chats', currentChatId);
+                const snap = await getDoc(docRef);
+                if(snap.exists()) {
+                    let messages = snap.data().messages;
+                    messages = messages.map(m => {
+                        if(m.timestamp == timestamp) {
+                            return { ...m, type: 'burned', content: null, text: '💣 Zerstört' };
+                        }
+                        return m;
+                    });
+                    await updateDoc(docRef, { messages: messages });
+                    showToast("Nachricht zerstört 🔥", "success");
+                }
+            } catch(e) { console.error("Burn failed", e); }
+        }
+
+        // --- CHAT CORE ---
+
+        async function connectToChat(friendUid) {
+            const roomID = [currentUser.uid, friendUid].sort().join('_');
+            currentChatId = roomID;
+            document.getElementById('messages-container').innerHTML = '<div class="text-center opacity-50 mt-5">Lade...</div>';
+
+            unsubscribeChat = onSnapshot(doc(db, 'chats', roomID), (snap) => {
+                if(!snap.exists()) { renderMessages([]); updateTurn(null); }
+                else {
+                    const data = snap.data();
+                    currentMessages = data.messages || []; 
+                    renderMessages(currentMessages);
+                    updateTurn(data.lastSenderId);
+                }
+            });
+        }
+
+        function renderMessages(msgs) {
+            const c = document.getElementById('messages-container');
+            c.innerHTML = '';
+            if(!msgs.length) { c.innerHTML = '<div class="text-center opacity-50 mt-10">Start 🏓</div>'; return; }
+
+            msgs.forEach(msg => {
+                const isMe = msg.senderId === currentUser.uid;
+                const div = document.createElement('div');
+                div.className = `flex w-full mb-3 ${isMe ? 'justify-end' : 'justify-start'}`;
+                
+                const bubble = document.createElement('div');
+                bubble.addEventListener('click', (e) => openReactionMenu(e, msg.timestamp));
+                bubble.style.backgroundColor = isMe ? 'var(--bubble-me)' : 'var(--bubble-other)';
+                bubble.style.color = isMe && !document.body.classList.contains('theme-dark') ? '#065f46' : 'var(--text-color)';
+                bubble.className = `max-w-[85%] px-3 py-2 text-lg shadow-sm border-2 border-[var(--card-border)] relative cursor-pointer active:scale-95 transition-transform ${isMe ? 'rounded-2xl rounded-tr-none rotate-1' : 'rounded-2xl rounded-tl-none -rotate-1'}`;
+
+                if (msg.type === 'burned') {
+                    bubble.innerHTML = `<div class="text-gray-400 italic text-sm"><i class="fas fa-bomb"></i> Inhalt verpufft</div>`;
+                    bubble.onclick = null;
+                }
+                else if (msg.type === 'image') {
+                    if (isMe) {
+                        bubble.innerHTML = `<img src="${msg.content}" class="rounded-lg max-h-40 border border-gray-300">`;
+                    } else {
+                        const imgDiv = document.createElement('div');
+                        imgDiv.className = "relative overflow-hidden rounded-lg cursor-pointer";
+                        imgDiv.addEventListener('click', (e) => {
+                            e.stopPropagation(); 
+                            viewImage(msg.timestamp, msg.content);
+                        });
+                        imgDiv.innerHTML = `
+                            <img src="${msg.content}" class="blur-secret max-h-40 w-full object-cover">
+                            <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <span class="bg-black/50 text-white px-2 py-1 rounded text-xs font-bold">1x View <i class="fas fa-eye"></i></span>
+                            </div>`;
+                        bubble.appendChild(imgDiv);
+                    }
+                } 
+                else if (msg.type === 'voice') {
+                    if (isMe) {
+                        bubble.innerHTML = `<audio controls src="${msg.content}" class="w-48 h-8"></audio>`;
+                    } else {
+                        const aid = 'audio-' + msg.timestamp;
+                        const audioContainer = document.createElement('div');
+                        audioContainer.innerHTML = `
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-microphone-alt text-red-400"></i>
+                                <div class="text-xs font-bold">1x Hören</div>
+                            </div>`;
+                        const audio = document.createElement('audio');
+                        audio.id = aid;
+                        audio.controls = true;
+                        audio.src = msg.content;
+                        audio.className = "w-48 h-8 mt-1";
+                        audio.addEventListener('ended', () => handleAudioEnd(audio, msg.timestamp));
+                        audioContainer.appendChild(audio);
+                        bubble.appendChild(audioContainer);
+                    }
+                }
+                else {
+                    bubble.textContent = msg.text || "";
+                }
+
+                if(msg.reaction) {
+                    const reactDiv = document.createElement('div');
+                    reactDiv.className = "reaction-bubble anim-emoji";
+                    reactDiv.textContent = msg.reaction;
+                    bubble.appendChild(reactDiv);
+                }
+
+                const ts = document.createElement('div');
+                ts.className = "text-[10px] text-right mt-1 opacity-50";
+                ts.textContent = new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                bubble.appendChild(ts);
+
+                div.appendChild(bubble);
+                c.appendChild(div);
+            });
+            c.scrollTop = c.scrollHeight;
+        }
+
+        function updateTurn(lastId) {
+            const me = currentUser.uid;
+            const input = document.getElementById('message-input');
+            const btns = [document.getElementById('send-btn'), document.getElementById('btn-cam')];
+            const locked = document.getElementById('locked-overlay');
+            const st = document.getElementById('chat-status');
+
+            if(lastId === me) {
+                input.disabled = true;
+                btns.forEach(b => b.disabled = true);
+                btns.forEach(b => b.classList.add('opacity-30'));
+                locked.classList.remove('hidden');
+                st.textContent = "WARTEN 🔒";
+            } else {
+                input.disabled = false;
+                btns.forEach(b => b.disabled = false);
+                btns.forEach(b => b.classList.remove('opacity-30'));
+                locked.classList.add('hidden');
+                st.textContent = "DU BIST DRAN";
+            }
+        }
+
+        function sendMessage(e) {
+            e.preventDefault();
+            const txt = document.getElementById('message-input').value.trim();
+            if(txt) sendMessageInternal('text', txt);
+        }
+
+        async function sendMessageInternal(type, content) {
+            if(!currentChatId) return;
+            document.getElementById('message-input').value = '';
+            
+            const docRef = doc(db, 'chats', currentChatId);
+            const msg = {
+                type: type,
+                text: type === 'text' ? content : (type === 'image' ? '📷 Foto' : '🎤 Audio'),
+                content: type === 'text' ? null : content,
+                senderId: currentUser.uid,
+                timestamp: Date.now(),
+                reaction: null 
+            };
+
+            try {
+                const snap = await getDoc(docRef);
+                if(!snap.exists()) await setDoc(docRef, { messages: [msg], lastSenderId: currentUser.uid });
+                else {
+                    if(snap.data().lastSenderId === currentUser.uid) { showToast("Warte!", "error"); return; }
+                    await updateDoc(docRef, { messages: arrayUnion(msg), lastSenderId: currentUser.uid });
+                }
+            } catch(e) { console.error(e); showToast("Sende-Fehler", "error"); }
+        }
+
+        // --- Auth/UI Functions ---
+        function showToast(m,t) {
+            const c=document.getElementById('toast-container'), e=document.createElement('div');
+            e.className=`toast ${t||''} show`; e.textContent=m; c.appendChild(e);
+            setTimeout(()=>e.remove(), 3000);
+        }
+
+        // Fix 3: Input validation and error handling
+        async function doRegister() {
+             const n=document.getElementById('reg-name').value, em=document.getElementById('reg-email').value, p=document.getElementById('reg-pass').value;
+             
+             if(!n || !em || !p) {
+                 showToast('Bitte alle Felder ausfüllen', 'error');
+                 return;
+             }
+             if(p.length < 6) {
+                 showToast('Passwort muss mindestens 6 Zeichen lang sein', 'error');
+                 return;
+             }
+             
+             try {
+                 const u = await createUserWithEmailAndPassword(auth, em, p);
+                 const c = Math.random().toString(36).substr(2,4).toUpperCase();
+                 await setDoc(doc(db,'codes',c), {uid:u.user.uid});
+                 await setDoc(doc(db,'users',u.user.uid), {name:n, email:em, friendCode:c, friends:[], createdAt:serverTimestamp()});
+                 showToast('Erfolgreich registriert!', 'success');
+             } catch(e) { 
+                 console.error('Register error:', e);
+                 let errorMsg = 'Registrierung fehlgeschlagen';
+                 if(e.code === 'auth/email-already-in-use') errorMsg = 'E-Mail bereits registriert';
+                 else if(e.code === 'auth/invalid-email') errorMsg = 'Ungültige E-Mail-Adresse';
+                 else if(e.code === 'auth/weak-password') errorMsg = 'Passwort zu schwach';
+                 showToast(errorMsg, 'error'); 
+             }
+        }
+        
+        async function doLogin() {
+            const em=document.getElementById('login-email').value, p=document.getElementById('login-pass').value;
+            
+            if(!em || !p) {
+                showToast('Bitte E-Mail und Passwort eingeben', 'error');
+                return;
+            }
+            
+            try { 
+                await signInWithEmailAndPassword(auth, em, p); 
+                showToast('Erfolgreich angemeldet!', 'success');
+            }
+            catch(e) { 
+                console.error('Login error:', e);
+                let errorMsg = 'Anmeldung fehlgeschlagen';
+                if(e.code === 'auth/user-not-found') errorMsg = 'Benutzer nicht gefunden';
+                else if(e.code === 'auth/wrong-password') errorMsg = 'Falsches Passwort';
+                else if(e.code === 'auth/invalid-email') errorMsg = 'Ungültige E-Mail-Adresse';
+                showToast(errorMsg, 'error'); 
+            }
+        }
+        
+        function doLogout() { signOut(auth); }
+        
+        async function loadUserProfile(uid) {
+            const snap = await getDoc(doc(db,'users',uid));
+            if(snap.exists()) { userProfile = snap.data(); friends = userProfile.friends||[]; renderFriends(); showDashboard(); }
+        }
+        
+        function copyCode() { 
+            navigator.clipboard.writeText(userProfile.friendCode); 
+            showToast("Kopiert!"); 
+        }
+        
+        // Fix 6: Duplicate friend validation
+        async function addFriend(e) {
+            e.preventDefault(); 
+            const code = document.getElementById('friend-code-input').value.trim().toUpperCase();
+            if(!code) return;
+            
+            if(friends.some(f => f.code === code)) {
+                showToast('Bereits befreundet!', 'error');
+                return;
+            }
+            
+            const cSnap = await getDoc(doc(db,'codes',code));
+            if(!cSnap.exists()) { showToast("Code falsch", 'error'); return; }
+            const fid = cSnap.data().uid;
+            
+            if(fid === currentUser.uid) {
+                showToast('Das bist du selbst!', 'error');
+                return;
+            }
+            
+            const fSnap = await getDoc(doc(db,'users',fid));
+            const newF = {uid:fid, code:code, name: fSnap.exists()?fSnap.data().name:'Freund'};
+            await updateDoc(doc(db,'users',currentUser.uid), {friends:arrayUnion(newF)});
+            friends.push(newF); renderFriends(); document.getElementById('friend-code-input').value='';
+            showToast('Freund hinzugefügt!', 'success');
+        }
+        
+        function renderFriends() {
+            const l = document.getElementById('friends-list'); l.innerHTML='';
+            friends.forEach(f => {
+                const d=document.createElement('div');
+                d.className="paper-card p-4 mb-3 rounded-xl flex justify-between items-center cursor-pointer";
+                d.addEventListener('click', ()=>showChat(f.uid, f.name));
+                d.innerHTML=`<div><div class="font-bold text-xl">${f.name}</div><div class="text-xs opacity-50">Code: ${f.code}</div></div><i class="fas fa-comment text-blue-500 text-xl"></i>`;
+                l.appendChild(d);
+            });
+        }
+        
+        // Navigation
+        function showStart() { hideAll('view-start'); }
+        function showRegister() { hideAll('view-register'); }
+        function showLogin() { hideAll('view-login'); }
+        function showDashboard() { 
+            if(unsubscribeChat) unsubscribeChat(); 
+            hideAll('view-dashboard'); 
+            if(userProfile) document.getElementById('display-my-code').textContent=userProfile.friendCode; 
+        }
+        function showChat(uid, n) { 
+            hideAll('view-chat'); 
+            document.getElementById('chat-partner-name').textContent=n; 
+            connectToChat(uid); 
+        }
+        function showSettings() { document.getElementById('view-settings').classList.remove('hidden'); }
+        function hideAll(id) {
+            ['view-start','view-register','view-login','view-dashboard','view-chat'].forEach(v => document.getElementById(v).classList.add('hidden'));
+            document.getElementById('view-settings').classList.add('hidden');
+            document.getElementById(id).classList.remove('hidden');
+        }
+        async function saveName() { 
+            const n=document.getElementById('settings-name').value.trim(); 
+            if(!n)return;
+            await updateDoc(doc(db,'users',currentUser.uid), {name:n});
+            userProfile.name=n; 
+            showToast("Gespeichert");
+        }
+        
+        // Fix 1: localStorage Settings Merge Logic
+        function setTheme(t) { 
+            document.body.classList.toggle('theme-dark', t==='dark'); 
+            try {
+                const settings = JSON.parse(localStorage.getItem('pp_settings') || '{}');
+                settings.theme = t;
+                localStorage.setItem('pp_settings', JSON.stringify(settings)); 
+            } catch(e) {
+                console.error('Settings save error:', e);
+            }
+        }
+        
+        function setFont(f) { 
+            document.body.classList.remove('font-hand','font-elegant','font-big'); 
+            document.body.classList.add('font-'+f); 
+            try {
+                const settings = JSON.parse(localStorage.getItem('pp_settings') || '{}');
+                settings.font = f;
+                localStorage.setItem('pp_settings', JSON.stringify(settings)); 
+            } catch(e) {
+                console.error('Settings save error:', e);
+            }
+        }
+
+        // Fix 2: Event listeners instead of inline onclick
+        document.getElementById('btn-show-register').addEventListener('click', showRegister);
+        document.getElementById('btn-show-login').addEventListener('click', showLogin);
+        document.getElementById('btn-register-back').addEventListener('click', showStart);
+        document.getElementById('btn-login-back').addEventListener('click', showStart);
+        document.getElementById('btn-do-register').addEventListener('click', doRegister);
+        document.getElementById('btn-do-login').addEventListener('click', doLogin);
+        document.getElementById('btn-show-settings').addEventListener('click', showSettings);
+        document.getElementById('btn-close-settings').addEventListener('click', showDashboard);
+        document.getElementById('btn-copy-code').addEventListener('click', copyCode);
+        document.getElementById('form-add-friend').addEventListener('submit', addFriend);
+        document.getElementById('btn-save-name').addEventListener('click', saveName);
+        document.getElementById('btn-theme-light').addEventListener('click', () => setTheme('light'));
+        document.getElementById('btn-theme-dark').addEventListener('click', () => setTheme('dark'));
+        document.getElementById('btn-font-hand').addEventListener('click', () => setFont('hand'));
+        document.getElementById('btn-font-elegant').addEventListener('click', () => setFont('elegant'));
+        document.getElementById('btn-font-big').addEventListener('click', () => setFont('big'));
+        document.getElementById('btn-logout').addEventListener('click', doLogout);
+        document.getElementById('btn-back-from-chat').addEventListener('click', showDashboard);
+        document.getElementById('form-send-message').addEventListener('submit', sendMessage);
+        document.getElementById('btn-cam').addEventListener('click', () => document.getElementById('img-input').click());
+        document.getElementById('img-input').addEventListener('change', function() { handleImageSelect(this); });
+        document.getElementById('btn-mic').addEventListener('click', toggleRecording);
+        document.getElementById('media-viewer').addEventListener('click', closeMediaViewer);
+        document.getElementById('reaction-overlay').addEventListener('click', (e) => {
+            if(e.target.id === 'reaction-overlay') closeReactionMenu();
+        });
+
+    </script>
+</body>
+</html>
