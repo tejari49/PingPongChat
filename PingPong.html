@@ -347,7 +347,10 @@
             friends.forEach(friend => {
                 const div = document.createElement('div');
                 div.className = 'friend-item';
-                div.innerHTML = `<div class="font-bold">${friend.email || friend.uid}</div>`;
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'font-bold';
+                nameDiv.textContent = friend.email || friend.uid;
+                div.appendChild(nameDiv);
                 div.addEventListener('click', () => openChat(friend.uid));
                 friendsList.appendChild(div);
             });
