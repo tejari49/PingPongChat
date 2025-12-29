@@ -783,8 +783,8 @@
             { name: 'Türkis', color: '#ccfbf1', id: 'teal' },
             { name: 'Indigo', color: '#e0e7ff', id: 'indigo' },
             { name: 'Grau', color: '#f3f4f6', id: 'gray' },
-            { name: 'Mint', color: '#d1fae5', id: 'mint' },
-            { name: 'Pfirsich', color: '#ffedd5', id: 'peach' }
+            { name: 'Mint', color: '#a7f3d0', id: 'mint' },
+            { name: 'Pfirsich', color: '#ffdbb5', id: 'peach' }
         ];
 
         // Emoji list
@@ -854,9 +854,9 @@
         // --- SCHEDULED MESSAGES ---
         function openScheduledModal() {
             document.getElementById('scheduled-modal').classList.remove('hidden');
-            // Set minimum date to now
+            // Set minimum date to now + 5 minutes (minimum time for scheduling to be meaningful)
             const now = new Date();
-            now.setMinutes(now.getMinutes() + 5); // At least 5 minutes from now
+            now.setMinutes(now.getMinutes() + 5);
             document.getElementById('scheduled-date').min = now.toISOString().slice(0, 16);
         }
 
@@ -921,18 +921,38 @@
         function startScheduledMessagesCheck() {
             if (scheduledCheckInterval) return;
             
+            // Only start interval if there are scheduled messages
+            if (scheduledMessages.length === 0) return;
+            
             scheduledCheckInterval = setInterval(() => {
                 const now = Date.now();
+                let hasMessages = false;
+                
                 scheduledMessages = scheduledMessages.filter(msg => {
-                    if (msg.scheduledTime <= now && msg.chatId === currentChatId) {
-                        // Send the message
-                        sendMessageInternal('text', msg.text, msg.replyTo);
-                        showToast('Geplante Nachricht gesendet!', 'success');
-                        return false; // Remove from array
+                    // Check all scheduled messages, not just current chat
+                    if (msg.scheduledTime <= now) {
+                        // Only send if we're in the correct chat
+                        if (msg.chatId === currentChatId) {
+                            sendMessageInternal('text', msg.text, msg.replyTo);
+                            showToast('Geplante Nachricht gesendet!', 'success');
+                        } else {
+                            // Keep for later when user opens that chat
+                            hasMessages = true;
+                            return true;
+                        }
+                        return false;
                     }
+                    hasMessages = true;
                     return true;
                 });
+                
                 saveScheduledToStorage();
+                
+                // Clear interval if no more messages
+                if (!hasMessages && scheduledMessages.length === 0) {
+                    clearInterval(scheduledCheckInterval);
+                    scheduledCheckInterval = null;
+                }
             }, 10000); // Check every 10 seconds
         }
 
