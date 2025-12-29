@@ -35,6 +35,79 @@
             --accent: #34d399;
         }
 
+        /* New Theme Options */
+        body.theme-mint {
+            --bg-color: #f0fdf4;
+            --bg-pattern: radial-gradient(#86efac 1px, transparent 1px);
+            --text-color: #14532d;
+            --card-bg: #dcfce7;
+            --card-border: #16a34a;
+            --bubble-me: #bbf7d0;
+            --bubble-other: #ffffff;
+            --input-bg: #dcfce7;
+            --accent: #22c55e;
+        }
+
+        body.theme-rose {
+            --bg-color: #fff1f2;
+            --bg-pattern: radial-gradient(#fda4af 1px, transparent 1px);
+            --text-color: #881337;
+            --card-bg: #ffe4e6;
+            --card-border: #e11d48;
+            --bubble-me: #fecdd3;
+            --bubble-other: #ffffff;
+            --input-bg: #ffe4e6;
+            --accent: #f43f5e;
+        }
+
+        body.theme-purple {
+            --bg-color: #faf5ff;
+            --bg-pattern: radial-gradient(#d8b4fe 1px, transparent 1px);
+            --text-color: #581c87;
+            --card-bg: #f3e8ff;
+            --card-border: #9333ea;
+            --bubble-me: #e9d5ff;
+            --bubble-other: #ffffff;
+            --input-bg: #f3e8ff;
+            --accent: #a855f7;
+        }
+
+        body.theme-ocean-deep {
+            --bg-color: #0c1e2e;
+            --bg-pattern: none;
+            --text-color: #e0f2fe;
+            --card-bg: #1e3a5f;
+            --card-border: #0ea5e9;
+            --bubble-me: #075985;
+            --bubble-other: #164e63;
+            --input-bg: #0e2a47;
+            --accent: #38bdf8;
+        }
+
+        body.theme-lavender {
+            --bg-color: #faf5ff;
+            --bg-pattern: radial-gradient(#e9d5ff 1px, transparent 1px);
+            --text-color: #4c1d95;
+            --card-bg: #f5f3ff;
+            --card-border: #7c3aed;
+            --bubble-me: #ddd6fe;
+            --bubble-other: #ffffff;
+            --input-bg: #ede9fe;
+            --accent: #8b5cf6;
+        }
+
+        body.theme-amber {
+            --bg-color: #fffbeb;
+            --bg-pattern: radial-gradient(#fcd34d 1px, transparent 1px);
+            --text-color: #78350f;
+            --card-bg: #fef3c7;
+            --card-border: #f59e0b;
+            --bubble-me: #fde68a;
+            --bubble-other: #ffffff;
+            --input-bg: #fef3c7;
+            --accent: #f59e0b;
+        }
+
         body.font-hand { font-family: 'Patrick Hand', cursive; }
         body.font-elegant { font-family: 'Playfair Display', serif; }
         body.font-big { font-family: 'Poppins', sans-serif; font-size: 1.1rem; }
@@ -273,6 +346,104 @@
             background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
         }
 
+        /* Reply/Quote Message Styles */
+        .reply-reference {
+            background: rgba(0, 0, 0, 0.05);
+            border-left: 3px solid var(--accent);
+            padding: 6px 10px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            opacity: 0.8;
+            cursor: pointer;
+        }
+
+        .reply-reference:hover {
+            opacity: 1;
+        }
+
+        .reply-author {
+            font-weight: bold;
+            color: var(--accent);
+            margin-bottom: 2px;
+        }
+
+        .reply-preview {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Scheduled Message Styles */
+        .scheduled-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.75rem;
+            opacity: 0.7;
+            margin-left: 8px;
+        }
+
+        .scheduled-badge {
+            background: #fbbf24;
+            color: #78350f;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        /* Custom Chat Color Picker */
+        .color-picker-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .color-picker-modal {
+            background: var(--card-bg);
+            border: 2px solid var(--card-border);
+            border-radius: 15px;
+            padding: 20px;
+            max-width: 90%;
+            width: 400px;
+        }
+
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .color-option {
+            width: 50px;
+            height: 50px;
+            border-radius: 10px;
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .color-option:hover {
+            transform: scale(1.1);
+        }
+
+        .color-option.selected {
+            border-color: var(--accent);
+            transform: scale(1.15);
+        }
+
+        /* Pulse highlight animation for scrolling to messages */
+        @keyframes pulse-highlight {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            50% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); }
+        }
+
         .hidden { display: none !important; }
     </style>
 </head>
@@ -409,6 +580,12 @@
                     <div class="grid grid-cols-2 gap-3 mb-6">
                         <button id="btn-theme-light" class="p-4 border-2 rounded-xl bg-[#f8f5f2] text-gray-800 font-bold">☀️ Papier</button>
                         <button id="btn-theme-dark" class="p-4 border-2 rounded-xl bg-black text-white font-bold">🌑 Dark</button>
+                        <button id="btn-theme-mint" class="p-4 border-2 rounded-xl bg-green-100 text-green-800 font-bold">🍃 Mint</button>
+                        <button id="btn-theme-rose" class="p-4 border-2 rounded-xl bg-rose-100 text-rose-800 font-bold">🌹 Rose</button>
+                        <button id="btn-theme-purple" class="p-4 border-2 rounded-xl bg-purple-100 text-purple-800 font-bold">💜 Purple</button>
+                        <button id="btn-theme-ocean-deep" class="p-4 border-2 rounded-xl bg-blue-900 text-blue-100 font-bold">🌊 Ocean Deep</button>
+                        <button id="btn-theme-lavender" class="p-4 border-2 rounded-xl bg-violet-100 text-violet-800 font-bold">💐 Lavender</button>
+                        <button id="btn-theme-amber" class="p-4 border-2 rounded-xl bg-amber-100 text-amber-800 font-bold">🌟 Amber</button>
                     </div>
                     <div class="space-y-3">
                         <button id="btn-font-hand" class="w-full text-left p-3 border-2 rounded-xl">Aa Handschrift</button>
@@ -434,6 +611,42 @@
                     <p class="text-xs opacity-60 mt-2">Erhalte Benachrichtigungen für neue Nachrichten</p>
                 </div>
                 <button id="btn-logout" class="w-full py-4 text-red-500 border-2 border-red-200 rounded-xl font-bold"><i class="fas fa-sign-out-alt"></i> Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Color Picker Modal -->
+    <div id="color-picker-overlay" class="hidden color-picker-overlay">
+        <div class="color-picker-modal">
+            <h3 class="text-xl font-bold mb-2">Chat-Farbe wählen</h3>
+            <p class="text-sm opacity-60 mb-4">Wähle eine Farbe für <span id="color-picker-friend-name" class="font-bold"></span></p>
+            <div class="color-grid" id="color-grid">
+                <!-- Colors will be injected by JS -->
+            </div>
+            <div class="flex gap-2 mt-4">
+                <button id="btn-color-cancel" class="flex-1 p-3 border-2 rounded-lg font-bold">Abbrechen</button>
+                <button id="btn-color-apply" class="flex-1 p-3 bg-green-500 text-white rounded-lg font-bold">Übernehmen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scheduled Messages Modal -->
+    <div id="scheduled-modal" class="hidden fixed inset-0 z-[120] bg-black/50 flex items-center justify-center p-4">
+        <div class="paper-card p-6 max-w-md w-full rounded-2xl">
+            <h3 class="text-xl font-bold mb-4">Nachricht planen</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-bold mb-2">Nachricht:</label>
+                    <textarea id="scheduled-text" class="w-full input-hand rounded-lg min-h-[100px]" placeholder="Deine Nachricht..."></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold mb-2">Senden am:</label>
+                    <input id="scheduled-date" type="datetime-local" class="w-full input-hand rounded-lg">
+                </div>
+                <div class="flex gap-2">
+                    <button id="btn-scheduled-cancel" class="flex-1 p-3 border-2 rounded-lg font-bold">Abbrechen</button>
+                    <button id="btn-scheduled-save" class="flex-1 p-3 bg-blue-500 text-white rounded-lg font-bold">Planen</button>
+                </div>
             </div>
         </div>
     </div>
@@ -481,6 +694,16 @@
 
         <!-- Input Area (Fixed Bottom logic via flexbox) -->
         <footer class="paper-card p-3 border-t shrink-0 relative z-30 pb-safe">
+            <!-- Reply Preview -->
+            <div id="reply-preview" class="hidden mb-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg border-l-4 border-blue-500 flex justify-between items-center">
+                <div class="flex-1">
+                    <div class="text-xs font-bold text-blue-600 dark:text-blue-400">Antworten auf:</div>
+                    <div id="reply-preview-text" class="text-sm opacity-70 truncate"></div>
+                </div>
+                <button id="btn-cancel-reply" class="text-gray-500 hover:text-gray-700 p-1">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
             
             <form id="form-send-message" class="flex gap-2 items-center">
                 <!-- Media Buttons -->
@@ -497,6 +720,11 @@
                 <!-- Emoji Button -->
                 <button type="button" id="btn-emoji" class="text-gray-500 hover:text-yellow-500 p-2 text-xl transition-colors">
                     <i class="fas fa-smile"></i>
+                </button>
+
+                <!-- Scheduled Message Button -->
+                <button type="button" id="btn-schedule" class="text-gray-500 hover:text-orange-500 p-2 text-xl transition-colors">
+                    <i class="fas fa-clock"></i>
                 </button>
 
                 <input id="message-input" type="text" placeholder="Nachricht..." class="flex-1 input-hand rounded-full px-4 border-2 bg-[var(--input-bg)]">
@@ -538,6 +766,26 @@
         let typingTimeout = null;
         let currentPartnerUid = null;
         let searchActive = false;
+        let replyToMessage = null;
+        let scheduledMessages = [];
+        let chatColors = {}; // friendUid -> color
+        let scheduledCheckInterval = null;
+
+        // Chat color options
+        const chatColorOptions = [
+            { name: 'Grün', color: '#d1fae5', id: 'green' },
+            { name: 'Blau', color: '#dbeafe', id: 'blue' },
+            { name: 'Rosa', color: '#fce7f3', id: 'pink' },
+            { name: 'Lila', color: '#f3e8ff', id: 'purple' },
+            { name: 'Gelb', color: '#fef3c7', id: 'yellow' },
+            { name: 'Orange', color: '#fed7aa', id: 'orange' },
+            { name: 'Rot', color: '#fee2e2', id: 'red' },
+            { name: 'Türkis', color: '#ccfbf1', id: 'teal' },
+            { name: 'Indigo', color: '#e0e7ff', id: 'indigo' },
+            { name: 'Grau', color: '#f3f4f6', id: 'gray' },
+            { name: 'Mint', color: '#d1fae5', id: 'mint' },
+            { name: 'Pfirsich', color: '#ffedd5', id: 'peach' }
+        ];
 
         // Emoji list
         const emojis = ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩','😘','😗','😚','😙','🥲','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🤐','🤨','😐','😑','😶','😶‍🌫️','😏','😒','🙄','😬','😮‍💨','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🤧','🥵','🥶','🥴','😵','😵‍💫','🤯','🤠','🥳','🥸','😎','🤓','🧐','😕','😟','🙁','☹️','😮','😯','😲','😳','🥺','😦','😧','😨','😰','😥','😢','😭','😱','😖','😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','☠️','💩','🤡','👹','👺','👻','👽','👾','🤖','😺','😸','😹','😻','😼','😽','🙀','😿','😾','🙈','🙉','🙊','💋','💌','💘','💝','💖','💗','💓','💞','💕','💟','❣️','💔','❤️‍🔥','❤️‍🩹','❤️','🧡','💛','💚','💙','💜','🤎','🖤','🤍','💯','💢','💥','💫','💦','💨','🕳️','💣','💬','👁️‍🗨️','🗨️','🗯️','💭','💤','👋','🤚','🖐️','✋','🖖','👌','🤌','🤏','✌️','🤞','🤟','🤘','🤙','👈','👉','👆','🖕','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✍️','💅','🤳','💪','🦾','🦿','🦵','🦶','👂','🦻','👃','🧠','🫀','🫁','🦷','🦴','👀','👁️','👅','👄','🫦','👶','🧒','👦','👧','🧑','👱','👨','🧔','🧔‍♂️','🧔‍♀️','👨‍🦰','👨‍🦱','👨‍🦳','👨‍🦲','👩','👩‍🦰','🧑‍🦰','👩‍🦱','🧑‍🦱','👩‍🦳','🧑‍🦳','👩‍🦲','🧑‍🦲','👱‍♀️','👱‍♂️','🧓','👴','👵','🙍','🙍‍♂️','🙍‍♀️','🙎','🙎‍♂️','🙎‍♀️','🙅','🙅‍♂️','🙅‍♀️','🙆','🙆‍♂️','🙆‍♀️','💁','💁‍♂️','💁‍♀️','🙋','🙋‍♂️','🙋‍♀️','🧏','🧏‍♂️','🧏‍♀️','🙇','🙇‍♂️','🙇‍♀️','🤦','🤦‍♂️','🤦‍♀️','🤷','🤷‍♂️','🤷‍♀️','🎉','🎊','🎈','🎁','🎀','🏆','🥇','🥈','🥉','⚽','⚾','🥎','🏀','🏐','🏈','🏉','🎾','🥏','🎳','🏏','🏑','🏒','🥍','🏓','🏸','🥊','🥋','🥅','⛳','⛸️','🎣','🤿','🎽','🎿','🛷','🥌','🎯','🪀','🪁','🎱','🔮','🪄','🧿','🎮','🕹️','🎰','🎲','🧩','🧸','🪅','🪆','♠️','♥️','♦️','♣️','♟️','🃏','🀄','🎴','🎭','🖼️','🎨','🧵','🪢','🧶','🪡'];
@@ -546,7 +794,9 @@
         function loadLocalSettings() {
             try {
                 const s = JSON.parse(localStorage.getItem('pp_settings') || '{}');
-                if(s.theme) document.body.classList.toggle('theme-dark', s.theme === 'dark');
+                if(s.theme && s.theme !== 'light') {
+                    document.body.classList.add('theme-' + s.theme);
+                }
                 if(s.font) {
                     document.body.classList.remove('font-hand', 'font-elegant', 'font-big');
                     document.body.classList.add('font-' + s.font);
@@ -559,6 +809,8 @@
             }
         }
         loadLocalSettings();
+        loadChatColors();
+        loadScheduledFromStorage();
 
         // --- EMOJI PICKER ---
         function initEmojiPicker() {
@@ -582,6 +834,187 @@
         function toggleEmojiPicker() {
             const picker = document.getElementById('emoji-picker');
             picker.classList.toggle('hidden');
+        }
+
+        // --- REPLY/QUOTE MESSAGES ---
+        function setReplyTo(message) {
+            replyToMessage = message;
+            const preview = document.getElementById('reply-preview');
+            const previewText = document.getElementById('reply-preview-text');
+            preview.classList.remove('hidden');
+            previewText.textContent = message.text || '📷 Bild';
+            document.getElementById('message-input').focus();
+        }
+
+        function cancelReply() {
+            replyToMessage = null;
+            document.getElementById('reply-preview').classList.add('hidden');
+        }
+
+        // --- SCHEDULED MESSAGES ---
+        function openScheduledModal() {
+            document.getElementById('scheduled-modal').classList.remove('hidden');
+            // Set minimum date to now
+            const now = new Date();
+            now.setMinutes(now.getMinutes() + 5); // At least 5 minutes from now
+            document.getElementById('scheduled-date').min = now.toISOString().slice(0, 16);
+        }
+
+        function closeScheduledModal() {
+            document.getElementById('scheduled-modal').classList.add('hidden');
+            document.getElementById('scheduled-text').value = '';
+            document.getElementById('scheduled-date').value = '';
+        }
+
+        function saveScheduledMessage() {
+            const text = document.getElementById('scheduled-text').value.trim();
+            const dateStr = document.getElementById('scheduled-date').value;
+            
+            if (!text || !dateStr) {
+                showToast('Bitte alle Felder ausfüllen', 'error');
+                return;
+            }
+            
+            const scheduledTime = new Date(dateStr).getTime();
+            if (scheduledTime <= Date.now()) {
+                showToast('Zeit muss in der Zukunft liegen', 'error');
+                return;
+            }
+            
+            const scheduled = {
+                id: Date.now(),
+                chatId: currentChatId,
+                text: text,
+                scheduledTime: scheduledTime,
+                replyTo: replyToMessage ? replyToMessage.timestamp : null
+            };
+            
+            scheduledMessages.push(scheduled);
+            saveScheduledToStorage();
+            closeScheduledModal();
+            showToast(`Nachricht geplant für ${new Date(scheduledTime).toLocaleString()}`, 'success');
+            
+            // Start checking for scheduled messages
+            startScheduledMessagesCheck();
+        }
+
+        function saveScheduledToStorage() {
+            try {
+                localStorage.setItem('pp_scheduled', JSON.stringify(scheduledMessages));
+            } catch(e) {
+                console.error('Failed to save scheduled messages', e);
+            }
+        }
+
+        function loadScheduledFromStorage() {
+            try {
+                const stored = localStorage.getItem('pp_scheduled');
+                if (stored) {
+                    scheduledMessages = JSON.parse(stored);
+                    startScheduledMessagesCheck();
+                }
+            } catch(e) {
+                console.error('Failed to load scheduled messages', e);
+            }
+        }
+
+        function startScheduledMessagesCheck() {
+            if (scheduledCheckInterval) return;
+            
+            scheduledCheckInterval = setInterval(() => {
+                const now = Date.now();
+                scheduledMessages = scheduledMessages.filter(msg => {
+                    if (msg.scheduledTime <= now && msg.chatId === currentChatId) {
+                        // Send the message
+                        sendMessageInternal('text', msg.text, msg.replyTo);
+                        showToast('Geplante Nachricht gesendet!', 'success');
+                        return false; // Remove from array
+                    }
+                    return true;
+                });
+                saveScheduledToStorage();
+            }, 10000); // Check every 10 seconds
+        }
+
+        // --- CUSTOM CHAT COLORS ---
+        function openColorPicker(friend) {
+            const overlay = document.getElementById('color-picker-overlay');
+            const grid = document.getElementById('color-grid');
+            const nameEl = document.getElementById('color-picker-friend-name');
+            
+            nameEl.textContent = friend.name;
+            overlay.dataset.friendUid = friend.uid;
+            
+            // Build color grid
+            grid.innerHTML = '';
+            chatColorOptions.forEach(colorOpt => {
+                const btn = document.createElement('button');
+                btn.className = 'color-option';
+                btn.style.backgroundColor = colorOpt.color;
+                btn.dataset.colorId = colorOpt.id;
+                btn.title = colorOpt.name;
+                
+                if (chatColors[friend.uid] === colorOpt.id) {
+                    btn.classList.add('selected');
+                }
+                
+                btn.addEventListener('click', () => {
+                    grid.querySelectorAll('.color-option').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                });
+                
+                grid.appendChild(btn);
+            });
+            
+            overlay.classList.remove('hidden');
+        }
+
+        function applyCustomColor() {
+            const overlay = document.getElementById('color-picker-overlay');
+            const friendUid = overlay.dataset.friendUid;
+            const selected = document.querySelector('.color-option.selected');
+            
+            if (selected) {
+                const colorId = selected.dataset.colorId;
+                chatColors[friendUid] = colorId;
+                
+                // Save to localStorage
+                try {
+                    localStorage.setItem('pp_chatColors', JSON.stringify(chatColors));
+                } catch(e) {
+                    console.error('Failed to save chat colors', e);
+                }
+                
+                showToast('Chat-Farbe gespeichert!', 'success');
+            }
+            
+            closeColorPicker();
+        }
+
+        function closeColorPicker() {
+            document.getElementById('color-picker-overlay').classList.add('hidden');
+        }
+
+        function loadChatColors() {
+            try {
+                const stored = localStorage.getItem('pp_chatColors');
+                if (stored) {
+                    chatColors = JSON.parse(stored);
+                }
+            } catch(e) {
+                console.error('Failed to load chat colors', e);
+            }
+        }
+
+        function getChatBubbleColor(friendUid, isMe) {
+            if (isMe) return 'var(--bubble-me)';
+            
+            if (chatColors[friendUid]) {
+                const colorOpt = chatColorOptions.find(c => c.id === chatColors[friendUid]);
+                return colorOpt ? colorOpt.color : 'var(--bubble-other)';
+            }
+            
+            return 'var(--bubble-other)';
         }
 
         // --- TYPING INDICATOR ---
@@ -765,12 +1198,20 @@
         }
 
         // --- MESSAGE EDIT/DELETE ---
-        function showMessageActions(msgTimestamp, msgElement) {
+        function showMessageActions(msgTimestamp, msgElement, msg) {
             // Remove any existing action menus
             document.querySelectorAll('.message-actions').forEach(m => m.remove());
             
             const actionsDiv = document.createElement('div');
             actionsDiv.className = 'message-actions';
+            
+            const replyBtn = document.createElement('button');
+            replyBtn.className = 'action-btn bg-green-100 hover:bg-green-200';
+            replyBtn.innerHTML = '<i class="fas fa-reply"></i> Antworten';
+            replyBtn.addEventListener('click', () => {
+                setReplyTo(msg);
+                document.querySelectorAll('.message-actions').forEach(m => m.remove());
+            });
             
             const editBtn = document.createElement('button');
             editBtn.className = 'action-btn bg-blue-100 hover:bg-blue-200';
@@ -782,6 +1223,7 @@
             deleteBtn.innerHTML = '<i class="fas fa-trash"></i> Löschen';
             deleteBtn.addEventListener('click', () => deleteMessage(msgTimestamp));
             
+            actionsDiv.appendChild(replyBtn);
             actionsDiv.appendChild(editBtn);
             actionsDiv.appendChild(deleteBtn);
             
@@ -1152,7 +1594,7 @@
                     let pressTimer;
                     bubble.addEventListener('touchstart', (e) => {
                         pressTimer = setTimeout(() => {
-                            showMessageActions(msg.timestamp, bubble);
+                            showMessageActions(msg.timestamp, bubble, msg);
                         }, 500);
                     });
                     bubble.addEventListener('touchend', () => {
@@ -1161,7 +1603,7 @@
                     bubble.addEventListener('mousedown', (e) => {
                         if (e.button === 0) { // Left click
                             pressTimer = setTimeout(() => {
-                                showMessageActions(msg.timestamp, bubble);
+                                showMessageActions(msg.timestamp, bubble, msg);
                             }, 500);
                         }
                     });
@@ -1170,17 +1612,61 @@
                     });
                 }
                 
+                // For all messages, right-click or double-tap to reply
+                bubble.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    setReplyTo(msg);
+                });
+                
+                let lastTap = 0;
+                bubble.addEventListener('touchend', (e) => {
+                    const currentTime = new Date().getTime();
+                    const tapLength = currentTime - lastTap;
+                    if (tapLength < 300 && tapLength > 0) {
+                        setReplyTo(msg);
+                        e.preventDefault();
+                    }
+                    lastTap = currentTime;
+                });
+                
                 // Click to add reaction (for all messages)
                 bubble.addEventListener('click', (e) => {
                     // Don't open reaction if clicking on action buttons
-                    if (!e.target.closest('.message-actions')) {
+                    if (!e.target.closest('.message-actions') && !e.target.closest('.reply-reference')) {
                         openReactionMenu(e, msg.timestamp);
                     }
                 });
                 
-                bubble.style.backgroundColor = isMe ? 'var(--bubble-me)' : 'var(--bubble-other)';
+                // Use custom color if available
+                bubble.style.backgroundColor = isMe ? 'var(--bubble-me)' : getChatBubbleColor(currentPartnerUid, false);
                 bubble.style.color = isMe && !document.body.classList.contains('theme-dark') ? '#065f46' : 'var(--text-color)';
                 bubble.className = `max-w-[85%] px-3 py-2 text-lg shadow-sm border-2 border-[var(--card-border)] relative cursor-pointer active:scale-95 transition-transform ${isMe ? 'rounded-2xl rounded-tr-none rotate-1' : 'rounded-2xl rounded-tl-none -rotate-1'}`;
+
+                // Add reply reference if this message is a reply
+                if (msg.replyTo) {
+                    const replyRef = msgs.find(m => m.timestamp === msg.replyTo);
+                    if (replyRef) {
+                        const replyDiv = document.createElement('div');
+                        replyDiv.className = 'reply-reference';
+                        replyDiv.innerHTML = `
+                            <div class="reply-author">${replyRef.senderId === currentUser.uid ? 'Du' : 'Partner'}</div>
+                            <div class="reply-preview">${replyRef.text || '📷 Bild'}</div>
+                        `;
+                        replyDiv.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            // Scroll to referenced message
+                            const targetMsg = document.querySelector(`[data-timestamp="${msg.replyTo}"]`);
+                            if (targetMsg) {
+                                targetMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                targetMsg.style.animation = 'pulse-highlight 1s';
+                            }
+                        });
+                        bubble.appendChild(replyDiv);
+                    }
+                }
+                
+                // Add data attribute for scrolling
+                bubble.dataset.timestamp = msg.timestamp;
 
                 if (msg.type === 'burned') {
                     bubble.innerHTML = `<div class="text-gray-400 italic text-sm"><i class="fas fa-bomb"></i> Inhalt verpufft</div>`;
@@ -1305,7 +1791,7 @@
             if(txt) sendMessageInternal('text', txt);
         }
 
-        async function sendMessageInternal(type, content) {
+        async function sendMessageInternal(type, content, replyToTimestamp = null) {
             if(!currentChatId) return;
             document.getElementById('message-input').value = '';
             
@@ -1319,8 +1805,14 @@
                 reaction: null,
                 delivered: true,
                 read: false,
-                edited: false
+                edited: false,
+                replyTo: replyToTimestamp || (replyToMessage ? replyToMessage.timestamp : null)
             };
+            
+            // Clear reply state
+            if (replyToMessage) {
+                cancelReply();
+            }
 
             try {
                 const snap = await getDoc(docRef);
@@ -1443,9 +1935,37 @@
             const l = document.getElementById('friends-list'); l.innerHTML='';
             friends.forEach(f => {
                 const d=document.createElement('div');
-                d.className="paper-card p-4 mb-3 rounded-xl flex justify-between items-center cursor-pointer";
-                d.addEventListener('click', ()=>showChat(f.uid, f.name));
-                d.innerHTML=`<div><div class="font-bold text-xl">${f.name}</div><div class="text-xs opacity-50">Code: ${f.code}</div></div><i class="fas fa-comment text-blue-500 text-xl"></i>`;
+                d.className="paper-card p-4 mb-3 rounded-xl flex justify-between items-center";
+                
+                const leftDiv = document.createElement('div');
+                leftDiv.className = "flex-1 cursor-pointer";
+                leftDiv.addEventListener('click', ()=>showChat(f.uid, f.name));
+                leftDiv.innerHTML=`<div class="font-bold text-xl">${f.name}</div><div class="text-xs opacity-50">Code: ${f.code}</div>`;
+                
+                const rightDiv = document.createElement('div');
+                rightDiv.className = "flex gap-2 items-center";
+                
+                // Color picker button
+                const colorBtn = document.createElement('button');
+                colorBtn.className = "p-2 hover:bg-gray-100 rounded-lg transition-colors";
+                colorBtn.innerHTML = '<i class="fas fa-palette text-purple-500"></i>';
+                colorBtn.title = "Chat-Farbe anpassen";
+                colorBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openColorPicker(f);
+                });
+                
+                // Chat button
+                const chatBtn = document.createElement('button');
+                chatBtn.className = "p-2 hover:bg-gray-100 rounded-lg transition-colors";
+                chatBtn.innerHTML = '<i class="fas fa-comment text-blue-500 text-xl"></i>';
+                chatBtn.addEventListener('click', ()=>showChat(f.uid, f.name));
+                
+                rightDiv.appendChild(colorBtn);
+                rightDiv.appendChild(chatBtn);
+                
+                d.appendChild(leftDiv);
+                d.appendChild(rightDiv);
                 l.appendChild(d);
             });
         }
@@ -1489,7 +2009,10 @@
         
         // Fix 1: localStorage Settings Merge Logic
         function setTheme(t) { 
-            document.body.classList.toggle('theme-dark', t==='dark'); 
+            document.body.classList.remove('theme-dark', 'theme-mint', 'theme-rose', 'theme-purple', 'theme-ocean-deep', 'theme-lavender', 'theme-amber');
+            if (t !== 'light') {
+                document.body.classList.add('theme-' + t);
+            }
             try {
                 const settings = JSON.parse(localStorage.getItem('pp_settings') || '{}');
                 settings.theme = t;
@@ -1556,6 +2079,28 @@
             document.getElementById('notification-banner').classList.add('hidden');
         });
         document.getElementById('message-input').addEventListener('input', handleTyping);
+
+        // New feature event listeners
+        document.getElementById('btn-schedule').addEventListener('click', openScheduledModal);
+        document.getElementById('btn-scheduled-cancel').addEventListener('click', closeScheduledModal);
+        document.getElementById('btn-scheduled-save').addEventListener('click', saveScheduledMessage);
+        document.getElementById('btn-cancel-reply').addEventListener('click', cancelReply);
+        document.getElementById('btn-color-cancel').addEventListener('click', closeColorPicker);
+        document.getElementById('btn-color-apply').addEventListener('click', applyCustomColor);
+        document.getElementById('color-picker-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'color-picker-overlay') closeColorPicker();
+        });
+        document.getElementById('scheduled-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'scheduled-modal') closeScheduledModal();
+        });
+        
+        // New theme buttons
+        document.getElementById('btn-theme-mint').addEventListener('click', () => setTheme('mint'));
+        document.getElementById('btn-theme-rose').addEventListener('click', () => setTheme('rose'));
+        document.getElementById('btn-theme-purple').addEventListener('click', () => setTheme('purple'));
+        document.getElementById('btn-theme-ocean-deep').addEventListener('click', () => setTheme('ocean-deep'));
+        document.getElementById('btn-theme-lavender').addEventListener('click', () => setTheme('lavender'));
+        document.getElementById('btn-theme-amber').addEventListener('click', () => setTheme('amber'));
 
         // Initialize emoji picker
         initEmojiPicker();
