@@ -444,6 +444,14 @@
             50% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); }
         }
 
+        /* Input actions transitions */
+        #input-actions {
+            max-height: 50px;
+            opacity: 1;
+            overflow: visible;
+            transition: max-height 0.3s ease, opacity 0.3s ease;
+        }
+
         .hidden { display: none !important; }
     </style>
 </head>
@@ -563,45 +571,64 @@
                     <h3 class="font-bold opacity-60 mb-3 uppercase text-sm">Profil</h3>
                     <div class="flex items-center gap-4 mb-3">
                         <div class="relative">
-                            <img id="profile-avatar-display" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23d1d5db'/%3E%3Ctext x='50' y='50' text-anchor='middle' dy='.3em' font-size='40' fill='white'%3E👤%3C/text%3E%3C/svg%3E" class="avatar">
+                            <img id="profile-avatar-display" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23d1d5db'/%3E%3Ctext x='50' y='50' text-anchor='middle' dy='.3em' font-size='40' fill='white'%3E👤%3C/text%3E%3C/svg%3E" class="avatar cursor-pointer hover:opacity-80 transition-opacity" title="Klicken zum Vergrößern">
                             <input type="file" id="avatar-input" accept="image/*" class="hidden">
-                            <button id="btn-upload-avatar" class="absolute bottom-0 right-0 bg-blue-500 text-white rounded-full w-6 h-6 text-xs flex items-center justify-center">
+                            <button id="btn-upload-avatar" class="absolute bottom-0 right-0 bg-blue-500 text-white rounded-full w-6 h-6 text-xs flex items-center justify-center hover:bg-blue-600" title="Eigenes Foto hochladen">
                                 <i class="fas fa-camera"></i>
                             </button>
                         </div>
                         <div class="flex-1">
                             <input id="settings-name" type="text" class="input-hand rounded-lg" placeholder="Dein Name">
+                            <button id="btn-reset-avatar" class="text-xs text-blue-600 hover:underline mt-1">🎲 Zufälliges Avatar</button>
                         </div>
                     </div>
                     <button id="btn-save-name" class="bg-green-500 text-white px-4 py-2 rounded-lg btn-hand font-bold w-full">Profil Speichern</button>
                 </div>
                 <div class="mb-8 border-b border-[var(--card-border)] pb-6">
-                    <h3 class="font-bold opacity-60 mb-3 uppercase text-sm">Design</h3>
-                    <div class="grid grid-cols-2 gap-3 mb-6">
-                        <button id="btn-theme-light" class="p-4 border-2 rounded-xl bg-[#f8f5f2] text-gray-800 font-bold">☀️ Papier</button>
-                        <button id="btn-theme-dark" class="p-4 border-2 rounded-xl bg-black text-white font-bold">🌑 Dark</button>
-                        <button id="btn-theme-mint" class="p-4 border-2 rounded-xl bg-green-100 text-green-800 font-bold">🍃 Mint</button>
-                        <button id="btn-theme-rose" class="p-4 border-2 rounded-xl bg-rose-100 text-rose-800 font-bold">🌹 Rose</button>
-                        <button id="btn-theme-purple" class="p-4 border-2 rounded-xl bg-purple-100 text-purple-800 font-bold">💜 Purple</button>
-                        <button id="btn-theme-ocean-deep" class="p-4 border-2 rounded-xl bg-blue-900 text-blue-100 font-bold">🌊 Ocean Deep</button>
-                        <button id="btn-theme-lavender" class="p-4 border-2 rounded-xl bg-violet-100 text-violet-800 font-bold">💐 Lavender</button>
-                        <button id="btn-theme-amber" class="p-4 border-2 rounded-xl bg-amber-100 text-amber-800 font-bold">🌟 Amber</button>
+                    <h3 class="font-bold opacity-60 mb-3 uppercase text-sm">Design & Farben</h3>
+                    <p class="text-xs opacity-60 mb-3">Themes</p>
+                    <div class="grid grid-cols-4 gap-2 mb-4">
+                        <button id="btn-theme-light" class="p-2 border-2 rounded-lg bg-[#f8f5f2] text-gray-800 text-xs font-bold">☀️</button>
+                        <button id="btn-theme-dark" class="p-2 border-2 rounded-lg bg-black text-white text-xs font-bold">🌑</button>
+                        <button id="btn-theme-mint" class="p-2 border-2 rounded-lg bg-green-100 text-green-800 text-xs font-bold">🍃</button>
+                        <button id="btn-theme-rose" class="p-2 border-2 rounded-lg bg-rose-100 text-rose-800 text-xs font-bold">🌹</button>
+                        <button id="btn-theme-purple" class="p-2 border-2 rounded-lg bg-purple-100 text-purple-800 text-xs font-bold">💜</button>
+                        <button id="btn-theme-ocean-deep" class="p-2 border-2 rounded-lg bg-blue-900 text-blue-100 text-xs font-bold">🌊</button>
+                        <button id="btn-theme-lavender" class="p-2 border-2 rounded-lg bg-violet-100 text-violet-800 text-xs font-bold">💐</button>
+                        <button id="btn-theme-amber" class="p-2 border-2 rounded-lg bg-amber-100 text-amber-800 text-xs font-bold">🌟</button>
                     </div>
-                    <div class="space-y-3">
-                        <button id="btn-font-hand" class="w-full text-left p-3 border-2 rounded-xl">Aa Handschrift</button>
-                        <button id="btn-font-elegant" class="w-full text-left p-3 border-2 rounded-xl font-serif">Aa Elegant</button>
-                        <button id="btn-font-big" class="w-full text-left p-3 border-2 rounded-xl font-sans font-bold">Aa Groß</button>
+                    <p class="text-xs opacity-60 mb-2">Schriftart</p>
+                    <div class="grid grid-cols-3 gap-2 mb-4">
+                        <button id="btn-font-hand" class="p-2 border-2 rounded-lg text-xs">Hand</button>
+                        <button id="btn-font-elegant" class="p-2 border-2 rounded-lg text-xs font-serif">Elegant</button>
+                        <button id="btn-font-big" class="p-2 border-2 rounded-lg text-xs font-bold">Groß</button>
+                    </div>
+                    <p class="text-xs opacity-60 mb-2">Chat-Hintergrund</p>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button id="btn-bg-default" class="p-2 border-2 rounded-lg text-xs font-bold">Standard</button>
+                        <button id="btn-bg-gradient" class="p-2 border-2 rounded-lg bg-gradient-to-br from-purple-400 to-purple-600 text-white text-xs font-bold">Gradient</button>
+                        <button id="btn-bg-ocean" class="p-2 border-2 rounded-lg bg-gradient-to-br from-blue-900 to-cyan-400 text-white text-xs font-bold">Ocean</button>
+                        <button id="btn-bg-sunset" class="p-2 border-2 rounded-lg bg-gradient-to-br from-pink-400 to-red-400 text-white text-xs font-bold">Sunset</button>
+                        <button id="btn-bg-forest" class="p-2 border-2 rounded-lg bg-gradient-to-br from-gray-900 to-teal-700 text-white text-xs font-bold">Forest</button>
                     </div>
                 </div>
                 <div class="mb-8 border-b border-[var(--card-border)] pb-6">
-                    <h3 class="font-bold opacity-60 mb-3 uppercase text-sm">Chat-Hintergrund</h3>
-                    <div class="grid grid-cols-2 gap-3">
-                        <button id="btn-bg-default" class="p-4 border-2 rounded-xl bg-[#f8f5f2] font-bold">Standard</button>
-                        <button id="btn-bg-gradient" class="p-4 border-2 rounded-xl bg-gradient-to-br from-purple-400 to-purple-600 text-white font-bold">Gradient</button>
-                        <button id="btn-bg-ocean" class="p-4 border-2 rounded-xl bg-gradient-to-br from-blue-900 to-cyan-400 text-white font-bold">Ocean</button>
-                        <button id="btn-bg-sunset" class="p-4 border-2 rounded-xl bg-gradient-to-br from-pink-400 to-red-400 text-white font-bold">Sunset</button>
-                        <button id="btn-bg-forest" class="p-4 border-2 rounded-xl bg-gradient-to-br from-gray-900 to-teal-700 text-white font-bold">Forest</button>
+                    <h3 class="font-bold opacity-60 mb-3 uppercase text-sm">Labor/Extras 🧪</h3>
+                    <div class="space-y-2">
+                        <label class="flex items-center justify-between p-3 border-2 rounded-lg cursor-pointer hover:bg-gray-50">
+                            <span class="text-sm">Nachricht-Reaktionen</span>
+                            <input type="checkbox" id="toggle-reactions" checked class="w-5 h-5">
+                        </label>
+                        <label class="flex items-center justify-between p-3 border-2 rounded-lg cursor-pointer hover:bg-gray-50">
+                            <span class="text-sm">Selbstzerstörende Medien</span>
+                            <input type="checkbox" id="toggle-burn" checked class="w-5 h-5">
+                        </label>
+                        <label class="flex items-center justify-between p-3 border-2 rounded-lg cursor-pointer hover:bg-gray-50">
+                            <span class="text-sm">Turn-based Modus</span>
+                            <input type="checkbox" id="toggle-turnbased" checked class="w-5 h-5">
+                        </label>
                     </div>
+                    <p class="text-xs opacity-60 mt-3">Experimentelle Features zum Testen</p>
                 </div>
                 <div class="mb-8 border-b border-[var(--card-border)] pb-6">
                     <h3 class="font-bold opacity-60 mb-3 uppercase text-sm">Benachrichtigungen</h3>
@@ -692,7 +719,7 @@
             <div class="emoji-category" id="emoji-grid"></div>
         </div>
 
-        <!-- Input Area (Fixed Bottom logic via flexbox) -->
+        <!-- Input Area (Full width with collapsible buttons) -->
         <footer class="paper-card p-3 border-t shrink-0 relative z-30 pb-safe">
             <!-- Reply Preview -->
             <div id="reply-preview" class="hidden mb-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg border-l-4 border-blue-500 flex justify-between items-center">
@@ -705,33 +732,34 @@
                 </button>
             </div>
             
-            <form id="form-send-message" class="flex gap-2 items-center">
-                <!-- Media Buttons -->
-                <input type="file" id="img-input" accept="image/*" class="hidden">
-                <button type="button" id="btn-cam" class="text-gray-500 hover:text-blue-500 p-2 text-xl transition-colors">
-                    <i class="fas fa-camera"></i>
-                </button>
+            <form id="form-send-message">
+                <!-- Full Width Input -->
+                <div class="flex gap-2 items-center mb-2">
+                    <input id="message-input" type="text" placeholder="Nachricht..." class="flex-1 input-hand rounded-full px-4 py-3 border-2 bg-[var(--input-bg)]">
+                    <button id="send-btn" type="submit" class="bg-green-500 text-white rounded-full w-12 h-12 flex items-center justify-center text-xl shadow-md btn-hand disabled:bg-gray-400 shrink-0">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
                 
-                <!-- Toggle Recording Button -->
-                <button type="button" id="btn-mic" class="text-gray-500 hover:text-red-500 p-2 text-xl transition-all border-2 border-transparent rounded-full w-10 h-10 flex items-center justify-center">
-                    <i class="fas fa-microphone"></i>
-                </button>
+                <!-- Action Buttons (collapsible) -->
+                <div id="input-actions" class="flex gap-3 justify-center transition-all duration-300">
+                    <input type="file" id="img-input" accept="image/*" class="hidden">
+                    <button type="button" id="btn-cam" class="text-gray-500 hover:text-blue-500 p-2 text-xl transition-colors" title="Foto">
+                        <i class="fas fa-camera"></i>
+                    </button>
+                    
+                    <button type="button" id="btn-mic" class="text-gray-500 hover:text-red-500 p-2 text-xl transition-all border-2 border-transparent rounded-full w-10 h-10 flex items-center justify-center" title="Sprachnachricht">
+                        <i class="fas fa-microphone"></i>
+                    </button>
 
-                <!-- Emoji Button -->
-                <button type="button" id="btn-emoji" class="text-gray-500 hover:text-yellow-500 p-2 text-xl transition-colors">
-                    <i class="fas fa-smile"></i>
-                </button>
+                    <button type="button" id="btn-emoji" class="text-gray-500 hover:text-yellow-500 p-2 text-xl transition-colors" title="Emoji">
+                        <i class="fas fa-smile"></i>
+                    </button>
 
-                <!-- Scheduled Message Button -->
-                <button type="button" id="btn-schedule" class="text-gray-500 hover:text-orange-500 p-2 text-xl transition-colors">
-                    <i class="fas fa-clock"></i>
-                </button>
-
-                <input id="message-input" type="text" placeholder="Nachricht..." class="flex-1 input-hand rounded-full px-4 border-2 bg-[var(--input-bg)]">
-                
-                <button id="send-btn" type="submit" class="bg-green-500 text-white rounded-full w-12 h-12 flex items-center justify-center text-xl shadow-md btn-hand disabled:bg-gray-400">
-                    <i class="fas fa-paper-plane"></i>
-                </button>
+                    <button type="button" id="btn-schedule" class="text-gray-500 hover:text-orange-500 p-2 text-xl transition-colors" title="Planen">
+                        <i class="fas fa-clock"></i>
+                    </button>
+                </div>
             </form>
         </footer>
     </div>
@@ -2099,6 +2127,71 @@
             document.getElementById('notification-banner').classList.add('hidden');
         });
         document.getElementById('message-input').addEventListener('input', handleTyping);
+
+        // Input area auto-hide buttons when typing
+        let inputActionsHidden = false;
+        document.getElementById('message-input').addEventListener('focus', () => {
+            if (document.getElementById('message-input').value.length > 0) {
+                hideInputActions();
+            }
+        });
+        document.getElementById('message-input').addEventListener('input', (e) => {
+            if (e.target.value.length > 0 && !inputActionsHidden) {
+                hideInputActions();
+            } else if (e.target.value.length === 0 && inputActionsHidden) {
+                showInputActions();
+            }
+        });
+
+        function hideInputActions() {
+            const actions = document.getElementById('input-actions');
+            actions.style.maxHeight = '0';
+            actions.style.opacity = '0';
+            actions.style.overflow = 'hidden';
+            inputActionsHidden = true;
+        }
+
+        function showInputActions() {
+            const actions = document.getElementById('input-actions');
+            actions.style.maxHeight = '50px';
+            actions.style.opacity = '1';
+            actions.style.overflow = 'visible';
+            inputActionsHidden = false;
+        }
+
+        // Profile avatar click to enlarge
+        document.getElementById('profile-avatar-display').addEventListener('click', () => {
+            const avatarSrc = document.getElementById('profile-avatar-display').src;
+            const viewer = document.getElementById('media-viewer');
+            const viewerImg = document.getElementById('viewer-img');
+            viewerImg.src = avatarSrc;
+            viewer.classList.remove('hidden');
+            // Change text for avatar viewing
+            const text = viewer.querySelector('.absolute');
+            text.textContent = 'Tippen zum Schließen';
+        });
+
+        // Reset to random avatar
+        document.getElementById('btn-reset-avatar').addEventListener('click', async () => {
+            const randomEmojis = ['😀','😎','🤓','🥳','😇','🤩','🦸','🦹','🧙','🧝','🧚','🧛','🧜','🧞','👨‍🚀','👩‍🚀','👨‍🎨','👩‍🎨','👨‍🍳','👩‍🍳','👨‍🌾','👩‍🌾','👨‍🏫','👩‍🏫','👨‍🎓','👩‍🎓','👨‍💻','👩‍💻'];
+            const randomEmoji = randomEmojis[Math.floor(Math.random() * randomEmojis.length)];
+            const randomColor = ['#FF6B6B','#4ECDC4','#45B7D1','#FFA07A','#98D8C8','#F7DC6F','#BB8FCE','#85C1E2'][Math.floor(Math.random() * 8)];
+            
+            const svgUrl = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='${encodeURIComponent(randomColor)}'/%3E%3Ctext x='50' y='50' text-anchor='middle' dy='.3em' font-size='45' fill='white'%3E${randomEmoji}%3C/text%3E%3C/svg%3E`;
+            
+            document.getElementById('profile-avatar-display').src = svgUrl;
+            
+            // Clear custom avatar from Firebase
+            if (currentUser) {
+                try {
+                    await updateDoc(doc(db, 'users', currentUser.uid), { avatar: null });
+                    userProfile.avatar = null;
+                    showToast('Zufälliges Avatar gesetzt!', 'success');
+                } catch(e) {
+                    console.error('Reset avatar error:', e);
+                }
+            }
+        });
 
         // New feature event listeners
         document.getElementById('btn-schedule').addEventListener('click', openScheduledModal);
