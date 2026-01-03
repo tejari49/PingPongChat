@@ -865,14 +865,14 @@
         el.className = `${bg} border border-black/5 dark:border-white/10 rounded-2xl p-3 shadow-sm relative`;
         el.innerHTML = `
           <div class="flex justify-between items-center mb-2">
-            <span class="text-[11px] text-slate-800 dark:text-slate-900 font-semibold">Post-it</span>
-            <button class="w-8 h-8 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-800 dark:text-slate-900"
+            <span class="text-[11px] text-slate-900 font-semibold">Post-it</span>
+            <button class="w-8 h-8 rounded-xl hover:bg-black/5 dark:hover:bg-black/10 text-slate-900"
                     onclick="removePostit(${idx})" title="Löschen">
               <i class="fa-solid fa-trash text-xs"></i>
             </button>
           </div>
 
-          <textarea class="w-full min-h-[110px] resize-none bg-transparent outline-none text-slate-900 dark:text-slate-900 font-light text-sm placeholder-slate-700"
+          <textarea class="w-full min-h-[110px] resize-none bg-transparent outline-none text-slate-900 font-light text-sm placeholder-slate-700"
                     placeholder="Notiz..."
                     oninput="updatePostitText(${idx}, this.value)">${(it.text || '').replace(/</g,'&lt;')}</textarea>
         `;
