@@ -272,9 +272,29 @@
 
               <div id="attach-menu" class="hidden absolute bottom-12 left-0 w-64 bg-white/90 dark:bg-ink-900/70 backdrop-blur-xl rounded-xl shadow-lg border border-slate-200/70 dark:border-white/10 overflow-hidden z-30">
                 <div class="p-2">
-                  <button type="button" onclick="openCamera(false); closeAttachMenu();" class="w-full text-left p-3 rounded-lg hover:bg-slate-50/70 dark:hover:bg-white/5 flex items-center gap-3 transition">
+                  <button type="button" onclick="document.getElementById('chat-image-input').click(); closeAttachMenu();" class="w-full text-left p-3 rounded-lg hover:bg-slate-50/70 dark:hover:bg-white/5 flex items-center gap-3 transition">
                     <div class="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center">
-                      <i class="fa-solid fa-camera text-emerald-600 dark:text-pastel-mint"></i>
+                      <i class="fa-solid fa-image text-emerald-600 dark:text-pastel-mint"></i>
+                    </div>
+                    <div>
+                      <p class="font-semibold text-sm dark:text-white">Bild senden</p>
+                      <p class="text-xs text-slate-400 font-light">Normal (bleibt im Chat)</p>
+                    </div>
+                  </button>
+
+                  <button type="button" onclick="document.getElementById('chat-image-once-input').click(); closeAttachMenu();" class="w-full text-left p-3 rounded-lg hover:bg-slate-50/70 dark:hover:bg-white/5 flex items-center gap-3 transition">
+                    <div class="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
+                      <i class="fa-solid fa-image text-amber-700 dark:text-amber-200"></i>
+                    </div>
+                    <div>
+                      <p class="font-semibold text-sm dark:text-white">Bild 1× Ansicht</p>
+                      <p class="text-xs text-slate-400 font-light">Löscht sich beim Antippen</p>
+                    </div>
+                  </button>
+
+                  <button type="button" onclick="openCamera(false); closeAttachMenu();" class="w-full text-left p-3 rounded-lg hover:bg-slate-50/70 dark:hover:bg-white/5 flex items-center gap-3 transition">
+                    <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                      <i class="fa-solid fa-camera text-blue-600 dark:text-blue-200"></i>
                     </div>
                     <div>
                       <p class="font-semibold text-sm dark:text-white">Kamera</p>
@@ -283,12 +303,12 @@
                   </button>
 
                   <button type="button" onclick="openCamera(true); closeAttachMenu();" class="w-full text-left p-3 rounded-lg hover:bg-slate-50/70 dark:hover:bg-white/5 flex items-center gap-3 transition">
-                    <div class="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
-                      <i class="fa-solid fa-camera text-amber-700 dark:text-amber-200"></i>
+                    <div class="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center">
+                      <i class="fa-solid fa-camera text-purple-600 dark:text-purple-200"></i>
                     </div>
                     <div>
                       <p class="font-semibold text-sm dark:text-white">Kamera 1× Ansicht</p>
-                      <p class="text-xs text-slate-400 font-light">Löscht 30s nach dem Öffnen</p>
+                      <p class="text-xs text-slate-400 font-light">Löscht sich beim Antippen</p>
                     </div>
                   </button>
                 </div>
@@ -329,8 +349,10 @@
                 </div>
               </div>
 
-              <input type="file" id="chat-image-input" accept="image/*" capture="environment" class="hidden" onchange="handleImageUpload(this,false)">
-              <input type="file" id="chat-image-once-input" accept="image/*" capture="environment" class="hidden" onchange="handleImageUpload(this,true)">
+              <input type="file" id="chat-image-input" accept="image/*" class="hidden" onchange="handleImageUpload(this,false)">
+              <input type="file" id="chat-image-once-input" accept="image/*" class="hidden" onchange="handleImageUpload(this,true)">
+              <input type="file" id="chat-camera-input" accept="image/*" capture="environment" class="hidden" onchange="handleImageUpload(this,false)">
+              <input type="file" id="chat-camera-once-input" accept="image/*" capture="environment" class="hidden" onchange="handleImageUpload(this,true)">
             </div>
 
             <input type="text" id="message-input"
@@ -2709,11 +2731,12 @@ AppId: ${appId}`;
         if (m.type === 'image') {
           const badge = m.viewOnce ? `<span class="absolute top-2 left-2 text-xs font-semibold bg-black/60 text-white px-2 py-1 rounded-full">1×</span>` : '';
           const hint = (m.viewOnce && m.viewOnceSeenAt) ? `<span class="absolute bottom-2 left-2 text-[10px] font-semibold bg-black/50 text-white px-2 py-1 rounded-full">läuft…</span>` : '';
+          const blurClass = (m.viewOnce && !m.viewOnceSeenAt) ? 'blur-img' : '';
           contentHtml = `
             <div class="relative">
               ${badge}
               ${hint}
-              <img src="${m.content}" class="max-w-[240px] rounded-xl shadow cursor-pointer border border-white/10"
+              <img src="${m.content}" class="max-w-[240px] rounded-xl shadow cursor-pointer border border-white/10 ${blurClass}"
                    onclick="showFullScreenImage('${m.content}', '${docSnap.id}', ${m.viewOnce ? 'true' : 'false'})">
             </div>
           `;
@@ -2843,7 +2866,7 @@ AppId: ${appId}`;
     // Open camera with ability to switch between front and back
     let currentCameraFacing = 'environment'; // 'environment' = back camera, 'user' = front camera
     window.openCamera = (viewOnce = false) => {
-      const inputId = viewOnce ? 'chat-image-once-input' : 'chat-image-input';
+      const inputId = viewOnce ? 'chat-camera-once-input' : 'chat-camera-input';
       const input = document.getElementById(inputId);
       if (!input) return;
       
@@ -2974,7 +2997,19 @@ AppId: ${appId}`;
     };
 
     window.handleImageModalClick = async () => {
-      document.getElementById('image-modal').classList.add('hidden');
+      const modal = document.getElementById('image-modal');
+      modal.classList.add('hidden');
+      
+      // If this is a view-once image, delete it immediately on tap
+      if (window.__modalImageViewOnce && window.__modalImageMessageId && activeChatId) {
+        try {
+          const msgRef = doc(db, 'artifacts', appId, 'public', 'data', 'chats', activeChatId, 'messages', window.__modalImageMessageId);
+          await deleteDoc(msgRef);
+        } catch(e) {
+          console.error('Error deleting view-once image:', e);
+        }
+      }
+      
       window.__modalImageMessageId = null;
       window.__modalImageViewOnce = false;
     };
