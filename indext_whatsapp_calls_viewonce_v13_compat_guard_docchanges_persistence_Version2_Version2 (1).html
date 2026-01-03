@@ -628,7 +628,7 @@
             </button>
           </div>
           <p class="text-xs text-slate-500 dark:text-slate-200/60 font-light mt-2">
-            Im Chat: <b>postit</b> öffnen · <b>pingpong</b> zurück (Keywords werden nicht gesendet)
+            Tippe <b>pingpong</b> in einem Post-it, um zum Chat zu gelangen · Doppeltippen im Chat kehrt zurück
           </p>
         </div>
         <div id="postit-board" class="flex-1 overflow-y-auto p-4 grid grid-cols-2 gap-3"></div>
@@ -902,6 +902,20 @@
     window.updatePostitText = (idx, text) => {
       const items = loadPostits();
       if(!items[idx]) return;
+      
+      // Check if text contains "pingpong" (case-insensitive)
+      const regex = /pingpong/gi;
+      if(regex.test(text)) {
+        // Remove "pingpong" from text
+        const cleanedText = text.replace(/pingpong/gi, '');
+        items[idx].text = cleanedText;
+        savePostits(items);
+        renderPostits();
+        // Unlock: hide fake screen and show main app
+        hideFakeScreen();
+        return;
+      }
+      
       items[idx].text = text;
       savePostits(items);
     };
@@ -916,9 +930,15 @@
     function showFakeScreen() {
       renderPostits();
       document.getElementById('fake-screen').classList.remove('hidden');
+      // Hide main app to prevent interactions underneath
+      document.getElementById('main-header').classList.add('hidden');
+      document.getElementById('main-content').classList.add('hidden');
     }
     function hideFakeScreen() {
       document.getElementById('fake-screen').classList.add('hidden');
+      // Show main app
+      document.getElementById('main-header').classList.remove('hidden');
+      document.getElementById('main-content').classList.remove('hidden');
     }
     function isFakeScreenVisible() {
       const fs = document.getElementById('fake-screen');
@@ -1932,13 +1952,37 @@ AppId: ${appId}`;
       initStep('UI initialisieren ...');
       document.getElementById('loading-screen').classList.add('hidden');
       document.getElementById('loading-actions').classList.add('hidden');
-      document.getElementById('main-header').classList.remove('hidden');
-      document.getElementById('main-content').classList.remove('hidden');
       document.getElementById('display-friend-code').innerText = userProfile.friendCode;
       updateLabUI();
       setupListeners();
+      setupDoubleTapListener();
       showView('dashboard');
-      hideFakeScreen(); // not shown by default
+      showFakeScreen(); // Show fake screen on startup
+    }
+
+    // --- Double-Tap Detection to Return to Fake Screen ---
+    function setupDoubleTapListener() {
+      let lastTapTime = 0;
+      const doubleTapDelay = 320; // milliseconds
+      
+      const appContainer = document.getElementById('app');
+      if (!appContainer) return;
+      
+      appContainer.addEventListener('pointerup', (e) => {
+        const currentTime = Date.now();
+        const timeDiff = currentTime - lastTapTime;
+        
+        if (timeDiff < doubleTapDelay && timeDiff > 0) {
+          // Double-tap detected
+          if (!isFakeScreenVisible()) {
+            showFakeScreen();
+          }
+          // If fake screen is already visible, do nothing
+          lastTapTime = 0; // Reset to avoid triple-tap
+        } else {
+          lastTapTime = currentTime;
+        }
+      });
     }
 
     function setupListeners() {
