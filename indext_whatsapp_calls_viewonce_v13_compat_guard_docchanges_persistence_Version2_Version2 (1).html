@@ -2644,8 +2644,8 @@ AppId: ${appId}`;
       document.getElementById('friend-settings-modal').classList.add('hidden');
     };
 
-    // --- View-once (C): mark on open, delete after 30s ---
-    async function markViewOnceSeenAndScheduleDelete(messageId) {
+    // --- View-once: mark on open (deletion happens on tap in handleImageModalClick) ---
+    async function markViewOnceSeen(messageId) {
       if(!activeChatId || !messageId) return;
 
       const msgRef = doc(db, 'artifacts', appId, 'public', 'data', 'chats', activeChatId, 'messages', messageId);
@@ -2658,20 +2658,6 @@ AppId: ${appId}`;
       if(!m.viewOnceSeenAt) {
         await updateDoc(msgRef, { viewOnceSeenAt: serverTimestamp() }).catch(()=>{});
       }
-
-      setTimeout(async () => {
-        try {
-          const s2 = await getDoc(msgRef);
-          if(!s2.exists()) return;
-          const m2 = s2.data();
-          if(!m2?.viewOnce) return;
-
-          const seenAt = m2.viewOnceSeenAt ? m2.viewOnceSeenAt.toMillis() : 0;
-          if(seenAt && Date.now() - seenAt >= 30000) {
-            await deleteDoc(msgRef);
-          }
-        } catch(e) { /* ignore */ }
-      }, 30000);
     }
 
     async function cleanupExpiredViewOnceInSnapshot(snap) {
@@ -2991,7 +2977,7 @@ AppId: ${appId}`;
       document.getElementById('image-modal').classList.remove('hidden');
 
       if(isViewOnce && messageId) {
-        try { await markViewOnceSeenAndScheduleDelete(messageId); }
+        try { await markViewOnceSeen(messageId); }
         catch(e) { console.error(e); }
       }
     };
