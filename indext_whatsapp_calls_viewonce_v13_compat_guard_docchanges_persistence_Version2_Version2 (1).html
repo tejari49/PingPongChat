@@ -903,11 +903,11 @@
       const items = loadPostits();
       if(!items[idx]) return;
       
-      // Check if text contains "pingpong" (case-insensitive)
+      // Check if text contains "pingpong" (case-insensitive) and remove it
       const regex = /pingpong/gi;
       if(regex.test(text)) {
-        // Remove "pingpong" from text
-        const cleanedText = text.replace(/pingpong/gi, '');
+        // Remove "pingpong" from text and clean up extra whitespace
+        const cleanedText = text.replace(/pingpong/gi, '').replace(/\s+/g, ' ').trim();
         items[idx].text = cleanedText;
         savePostits(items);
         renderPostits();
@@ -1972,6 +1972,7 @@ AppId: ${appId}`;
         const currentTime = Date.now();
         const timeDiff = currentTime - lastTapTime;
         
+        // Check if taps are within double-tap window (> 0 prevents same-timestamp events)
         if (timeDiff < doubleTapDelay && timeDiff > 0) {
           // Double-tap detected
           if (!isFakeScreenVisible()) {
