@@ -1,0 +1,3347 @@
+<!DOCTYPE html>
+<html lang="de" class="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PingPong Chat</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            ink: { 950: '#05070d', 900: '#0b1220', 850: '#111a2b' },
+            pastel: { mint:'#A7F3D0', sky:'#BAE6FD', lilac:'#E9D5FF', rose:'#FBCFE8' },
+            slate: { 850: '#1e293b', 900: '#0f172a', 950: '#020617' }
+          },
+          animation: {
+            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+          }
+        }
+      }
+    }
+  </script>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    .fade-in { animation: fadeIn 0.25s ease-in-out; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Slightly softer media look */
+    .blur-img { filter: blur(4px); transition: filter 0.3s; }
+    .blur-img:hover, .blur-img.loaded { filter: blur(0); }
+    video { transform: scaleX(-1); object-fit: cover; }
+
+    /* Dice */
+    .dice { width: 60px; height: 60px; position: relative; transform-style: preserve-3d; transition: transform 1s; transform: rotateX(0) rotateY(0) rotateZ(0); }
+    .dice.rolling { animation: roll 1s ease-out; }
+    @keyframes roll { 0% { transform: rotateX(0) rotateY(0) rotateZ(0); } 100% { transform: rotateX(720deg) rotateY(360deg) rotateZ(180deg); } }
+    .dice-face { position: absolute; width: 100%; height: 100%; border-radius: 12px; background: white; border: 2px solid #333; display: flex; justify-content: center; align-items: center; font-size: 24px; font-weight: 700; }
+    .front { transform: translateZ(30px); }
+    .back { transform: rotateY(180deg) translateZ(30px); }
+    .right { transform: rotateY(90deg) translateZ(30px); }
+    .left { transform: rotateY(-90deg) translateZ(30px); }
+    .top { transform: rotateX(90deg) translateZ(30px); }
+    .bottom { transform: rotateX(-90deg) translateZ(30px); }
+    .dot { width: 10px; height: 10px; background: #333; border-radius: 50%; }
+  </style>
+
+  <!-- Firebase compat (best for file:// & Cordova) -->
+  <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
+</head>
+
+<body class="bg-slate-100 dark:bg-ink-950 text-slate-900 dark:text-slate-100/90 transition-colors duration-300">
+  <div id="app" class="max-w-md mx-auto h-[100dvh] flex flex-col bg-white/90 dark:bg-ink-900/60 backdrop-blur-xl relative shadow-2xl overflow-hidden border border-slate-200/60 dark:border-white/10">
+
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="absolute inset-0 z-50 flex items-center justify-center bg-ink-950 text-white">
+      <div class="text-center px-6">
+        <i class="fa-solid fa-table-tennis-paddle-ball fa-spin text-4xl mb-4 text-pastel-mint"></i>
+        <h2 class="text-xl font-semibold tracking-wide">PingPong Chat</h2>
+        <p id="loading-text" class="text-slate-300/80 text-sm mt-2 font-light">Initialisiere...</p>
+
+        <div id="loading-actions" class="hidden mt-5 space-y-2">
+          <div id="loading-error-detail" class="text-xs text-slate-200 bg-white/5 border border-white/10 rounded-xl p-3 text-left whitespace-pre-wrap"></div>
+          <div class="flex gap-2 justify-center">
+            <button onclick="forceLogout()" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-semibold">Abmelden</button>
+            <button onclick="copyInitLog()" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-sm font-semibold">Diagnose kopieren</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Auth Screen -->
+    <div id="auth-screen" class="hidden absolute inset-0 z-40 flex flex-col items-center justify-center bg-white dark:bg-ink-950 p-6 overflow-y-auto">
+      <div class="w-full max-w-sm">
+        <div class="text-center mb-8">
+          <i class="fa-solid fa-table-tennis-paddle-ball text-5xl text-pastel-mint mb-4"></i>
+          <h1 class="text-3xl font-semibold tracking-wide text-slate-800 dark:text-slate-100/90">PingPong</h1>
+          <p class="text-slate-500 dark:text-slate-300/70 font-light">Der minimalistische Chat.</p>
+        </div>
+
+        <div id="auth-error-box" class="hidden bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-200 p-3 rounded-xl text-sm mb-4 border border-red-100 dark:border-red-900/40"></div>
+
+        <form id="auth-form" onsubmit="handleAuthAction(event)" class="space-y-4">
+          <div id="field-name" class="hidden fade-in">
+            <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200/80 mb-1">Dein Name</label>
+            <input type="text" id="input-name" placeholder="Dein Nickname"
+              class="w-full p-3 border border-slate-200 dark:border-white/10 rounded-xl bg-slate-50 dark:bg-white/5 dark:text-white focus:ring-2 focus:ring-pastel-mint outline-none transition font-light">
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200/80 mb-1">E-Mail</label>
+            <input type="email" id="input-email" required placeholder="name@beispiel.de"
+              class="w-full p-3 border border-slate-200 dark:border-white/10 rounded-xl bg-slate-50 dark:bg-white/5 dark:text-white focus:ring-2 focus:ring-pastel-mint outline-none transition font-light">
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 dark:text-slate-200/80 mb-1">Passwort</label>
+            <input type="password" id="input-password" required placeholder="••••••••"
+              class="w-full p-3 border border-slate-200 dark:border-white/10 rounded-xl bg-slate-50 dark:bg-white/5 dark:text-white focus:ring-2 focus:ring-pastel-mint outline-none transition font-light">
+          </div>
+
+          <button type="submit" id="btn-submit"
+            class="w-full bg-ink-950 dark:bg-white/10 dark:hover:bg-white/15 text-white p-4 rounded-xl font-semibold hover:opacity-95 transition shadow-lg mt-4 border border-white/10">
+            Einloggen
+          </button>
+        </form>
+
+        <div class="mt-6 text-center">
+          <p class="text-slate-500 dark:text-slate-300/70 text-sm font-light">
+            <span id="text-toggle-msg">Noch kein Konto?</span>
+            <button onclick="toggleAuthMode()" id="btn-toggle" class="text-emerald-600 dark:text-pastel-mint font-semibold hover:underline ml-1">Jetzt registrieren</button>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Header -->
+    <header id="main-header" class="hidden bg-white/80 dark:bg-ink-900/40 backdrop-blur-xl border-b border-slate-200/70 dark:border-white/10 p-4 flex justify-between items-center z-10">
+      <div class="flex items-center gap-2 cursor-pointer" onclick="showView('dashboard')">
+        <i class="fa-solid fa-table-tennis-paddle-ball text-pastel-mint text-xl"></i>
+        <h1 class="font-semibold tracking-wide text-slate-800 dark:text-slate-100/90 text-lg">PingPong</h1>
+      </div>
+      <div class="flex gap-4 items-center">
+        <button onclick="showView('settings')" class="text-slate-500 dark:text-slate-200/70 hover:text-emerald-500 relative flex items-center gap-2">
+          <img id="header-avatar" src="" class="w-8 h-8 rounded-full object-cover hidden border border-slate-200/70 dark:border-white/10">
+          <i id="header-settings-icon" class="fa-solid fa-gear text-xl"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main id="main-content" class="hidden flex-1 overflow-y-auto relative bg-slate-50 dark:bg-ink-950">
+      <!-- DASHBOARD -->
+      <div id="view-dashboard" class="p-4 space-y-6 fade-in pb-24">
+
+        <section class="bg-white/80 dark:bg-ink-900/40 backdrop-blur-xl p-6 rounded-2xl shadow-sm border border-slate-200/70 dark:border-white/10 text-center relative overflow-hidden group">
+          <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-pastel-mint to-pastel-sky opacity-80"></div>
+          <p class="text-xs text-slate-500 dark:text-slate-200/60 uppercase tracking-wider font-semibold mb-2">Dein Fingerabdruck-Code</p>
+          <div onclick="copyFriendCode()" class="cursor-pointer inline-block relative">
+            <h2 id="display-friend-code" class="text-4xl font-mono font-semibold text-slate-800 dark:text-slate-100 tracking-widest group-hover:scale-105 transition-transform">....</h2>
+            <p class="text-xs text-emerald-600 dark:text-pastel-mint mt-1 opacity-0 group-hover:opacity-100 transition font-medium">Kopieren</p>
+          </div>
+        </section>
+
+        <section class="bg-white/80 dark:bg-ink-900/40 backdrop-blur-xl p-4 rounded-2xl shadow-sm border border-slate-200/70 dark:border-white/10">
+          <h3 class="font-semibold text-slate-700 dark:text-slate-200/80 mb-3 text-sm">Freund hinzufügen</h3>
+          <div class="flex gap-2">
+            <input type="text" id="add-friend-input" maxlength="4" placeholder="CODE (z.B. X9P2)"
+              class="flex-1 p-3 border border-slate-200 dark:border-white/10 rounded-xl bg-slate-50 dark:bg-white/5 dark:text-white font-mono uppercase focus:ring-2 focus:ring-pastel-mint outline-none">
+            <button onclick="sendFriendRequestByCode()"
+              class="bg-emerald-600/90 hover:bg-emerald-600 text-white px-4 rounded-xl transition shadow-md border border-white/10">
+              <i class="fa-solid fa-user-plus"></i>
+            </button>
+          </div>
+        </section>
+
+        <section id="section-incoming" class="hidden">
+          <h3 class="font-semibold text-slate-700 dark:text-slate-200/80 mb-2 text-sm px-1 flex items-center gap-2"><i class="fa-solid fa-inbox text-pastel-sky"></i> Anfragen</h3>
+          <div id="list-incoming" class="space-y-2"></div>
+        </section>
+
+        <section id="section-outgoing" class="hidden">
+          <h3 class="font-semibold text-slate-700 dark:text-slate-200/80 mb-2 text-sm px-1 flex items-center gap-2"><i class="fa-regular fa-paper-plane text-slate-400"></i> Gesendet</h3>
+          <div id="list-outgoing" class="space-y-2"></div>
+        </section>
+
+        <section>
+          <h3 class="font-semibold text-slate-700 dark:text-slate-200/80 mb-3 text-sm px-1">Deine Freunde</h3>
+
+          <div class="flex gap-2 mb-3 items-center">
+            <div class="flex-1 relative">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+              <input id="friend-search" type="text" placeholder="Freunde suchen..." oninput="applyFriendFilter()"
+                class="w-full pl-9 pr-3 py-2 border border-slate-200 dark:border-white/10 rounded-xl bg-slate-50 dark:bg-white/5 dark:text-white text-sm focus:ring-2 focus:ring-pastel-mint outline-none font-light">
+            </div>
+            <button id="btn-filter-online" onclick="toggleOnlineFilter()"
+              class="px-3 py-2 rounded-xl text-sm font-semibold border border-slate-200 dark:border-white/10 bg-white/80 dark:bg-ink-900/40 text-slate-600 dark:text-slate-200/80 hover:border-emerald-200 hover:text-emerald-600 transition">
+              Online
+            </button>
+          </div>
+
+          <div id="list-friends" class="space-y-2">
+            <div class="text-center text-slate-400 py-8 text-sm">Noch keine Freunde.<br>Tausche Codes aus!</div>
+          </div>
+        </section>
+      </div>
+
+      <!-- CHAT -->
+      <div id="view-chat" class="hidden h-full flex flex-col bg-white dark:bg-ink-950">
+        <div class="p-3 border-b border-slate-200/70 dark:border-white/10 flex items-center justify-between bg-white/80 dark:bg-ink-900/40 backdrop-blur-xl z-10">
+          <button onclick="showView('dashboard')" class="p-2 text-slate-500 dark:text-slate-200/70 hover:bg-slate-100/70 dark:hover:bg-white/5 rounded-full">
+            <i class="fa-solid fa-arrow-left"></i>
+          </button>
+
+          <div class="flex items-center gap-3 cursor-pointer p-1 rounded-lg hover:bg-slate-50/70 dark:hover:bg-white/5 transition" onclick="openFriendSettingsModal()">
+            <img id="chat-partner-avatar" src="" class="w-8 h-8 rounded-full object-cover bg-slate-200">
+            <div class="flex flex-col">
+              <span id="chat-partner-name" class="font-semibold tracking-wide text-slate-800 dark:text-slate-100/90 text-sm">Chat</span>
+              <div class="flex items-center gap-1">
+                <span id="chat-partner-status-indicator" class="w-2 h-2 rounded-full bg-gray-400"></span>
+                <span id="chat-partner-status-text" class="text-xs text-slate-400 font-light">Offline</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-1 relative">
+            <button onclick="startVideoCall()" class="p-2 text-emerald-600 dark:text-pastel-mint hover:bg-emerald-50/70 dark:hover:bg-white/5 rounded-full transition" title="Videoanruf">
+              <i class="fa-solid fa-video"></i>
+            </button>
+
+            <button id="minigame-button" class="p-2 text-purple-500 hover:bg-purple-50/70 dark:hover:bg-white/5 rounded-full transition hidden" title="Minigames" onclick="openMinigameMenu()">
+              <i class="fa-solid fa-gamepad"></i>
+            </button>
+
+            <button onclick="toggleChatMenu()" class="p-2 text-slate-400 dark:text-slate-200/60 hover:text-slate-800 dark:hover:text-white">
+              <i class="fa-solid fa-ellipsis-vertical"></i>
+            </button>
+
+            <div id="chat-menu" class="hidden absolute right-0 top-10 w-48 bg-white/90 dark:bg-ink-900/70 backdrop-blur-xl shadow-xl rounded-xl border border-slate-200/70 dark:border-white/10 overflow-hidden z-20">
+              <button onclick="openFriendSettingsModal()" class="w-full text-left px-4 py-3 text-sm text-slate-700 dark:text-slate-200/80 hover:bg-slate-50/70 dark:hover:bg-white/5 flex items-center gap-2">
+                <i class="fa-solid fa-sliders w-4"></i> Einstellungen
+              </button>
+              <button onclick="toggleMuteCurrentChat()" class="w-full text-left px-4 py-3 text-sm text-slate-700 dark:text-slate-200/80 hover:bg-slate-50/70 dark:hover:bg-white/5 flex items-center gap-2">
+                <i id="icon-mute" class="fa-solid fa-volume-xmark w-4"></i> <span id="text-mute">Stumm</span>
+              </button>
+              <button onclick="toggleBlockCurrentChat()" class="w-full text-left px-4 py-3 text-sm text-red-600 dark:text-red-300 hover:bg-red-50/70 dark:hover:bg-red-900/20 flex items-center gap-2 border-t border-slate-200/70 dark:border-white/10">
+                <i class="fa-solid fa-ban w-4"></i> <span id="text-block">Blockieren</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="messages-container" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 dark:bg-ink-950 scroll-smooth"></div>
+
+        <div class="p-3 bg-white/80 dark:bg-ink-900/40 backdrop-blur-xl border-t border-slate-200/70 dark:border-white/10">
+          <div id="pingpong-status" class="hidden text-center text-xs font-semibold text-slate-500 dark:text-slate-200/60 mb-2 flex justify-center items-center gap-2">
+            <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Spam-Modus aktiv
+          </div>
+
+          <div id="reply-bar" class="hidden mb-2 px-3 py-2 rounded-xl bg-slate-100/70 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-xs text-slate-500 dark:text-slate-200/60 font-light">Antwort auf <span id="reply-to-name" class="font-semibold"></span></p>
+              <p id="reply-to-preview" class="text-sm dark:text-white truncate font-light"></p>
+            </div>
+            <button type="button" onclick="clearReplyTarget()" class="shrink-0 w-9 h-9 rounded-full hover:bg-slate-200/70 dark:hover:bg-white/10 flex items-center justify-center" title="Antwort abbrechen">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+
+          <!-- PingPong Turn Lock Hint -->
+          <div id="turn-lock-hint"
+               class="hidden mb-2 px-3 py-2 rounded-xl bg-slate-100/70 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 text-xs text-slate-600 dark:text-slate-200/70 font-light">
+            <span class="font-semibold">Gesperrt:</span> Warte auf die Antwort von <span id="turn-lock-name" class="font-semibold"></span>.
+          </div>
+
+          <form id="chat-form" onsubmit="sendMessage(event)" class="flex gap-2 items-center">
+            <div class="relative">
+              <button type="button" onclick="toggleAttachMenu()" class="cursor-pointer text-slate-400 dark:text-slate-200/60 hover:text-emerald-600 dark:hover:text-pastel-mint p-2 transition-colors" title="Anhänge">
+                <i class="fa-solid fa-paperclip text-lg"></i>
+              </button>
+
+              <div id="attach-menu" class="hidden absolute bottom-12 left-0 w-64 bg-white/90 dark:bg-ink-900/70 backdrop-blur-xl rounded-xl shadow-lg border border-slate-200/70 dark:border-white/10 overflow-hidden z-30">
+                <div class="p-2">
+                  <button type="button" onclick="document.getElementById('chat-image-input').click(); closeAttachMenu();" class="w-full text-left p-3 rounded-lg hover:bg-slate-50/70 dark:hover:bg-white/5 flex items-center gap-3 transition">
+                    <div class="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center">
+                      <i class="fa-solid fa-image text-emerald-600 dark:text-pastel-mint"></i>
+                    </div>
+                    <div>
+                      <p class="font-semibold text-sm dark:text-white">Bild senden</p>
+                      <p class="text-xs text-slate-400 font-light">Normal (bleibt im Chat)</p>
+                    </div>
+                  </button>
+
+                  <button type="button" onclick="document.getElementById('chat-image-once-input').click(); closeAttachMenu();" class="w-full text-left p-3 rounded-lg hover:bg-slate-50/70 dark:hover:bg-white/5 flex items-center gap-3 transition">
+                    <div class="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
+                      <i class="fa-solid fa-eye-slash text-amber-700 dark:text-amber-200"></i>
+                    </div>
+                    <div>
+                      <p class="font-semibold text-sm dark:text-white">Bild 1× Ansicht</p>
+                      <p class="text-xs text-slate-400 font-light">Löscht 30s nach dem Öffnen</p>
+                    </div>
+                  </button>
+                </div>
+
+                <div class="border-t border-slate-200/70 dark:border-white/10"></div>
+
+                <div class="p-2">
+                  <p class="px-2 pt-2 pb-1 text-xs font-semibold text-slate-500 dark:text-slate-200/60">Minigames</p>
+                  <button type="button" onclick="startMinigame('dice'); closeAttachMenu();" class="w-full text-left p-3 rounded-lg hover:bg-slate-50/70 dark:hover:bg-white/5 flex items-center gap-3 transition">
+                    <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                      <i class="fa-solid fa-dice text-blue-600 dark:text-blue-200"></i>
+                    </div>
+                    <div>
+                      <p class="font-semibold text-sm dark:text-white">Würfeln</p>
+                      <p class="text-xs text-slate-400 font-light">Schnell starten</p>
+                    </div>
+                  </button>
+
+                  <button type="button" onclick="startMinigame('rps'); closeAttachMenu();" class="w-full text-left p-3 rounded-lg hover:bg-slate-50/70 dark:hover:bg-white/5 flex items-center gap-3 transition">
+                    <div class="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                      <i class="fa-solid fa-hand-fist text-red-600 dark:text-red-200"></i>
+                    </div>
+                    <div>
+                      <p class="font-semibold text-sm dark:text-white">Schere–Stein–Papier</p>
+                      <p class="text-xs text-slate-400 font-light">Klassiker</p>
+                    </div>
+                  </button>
+
+                  <button type="button" onclick="startMinigame('truth'); closeAttachMenu();" class="w-full text-left p-3 rounded-lg hover:bg-slate-50/70 dark:hover:bg-white/5 flex items-center gap-3 transition">
+                    <div class="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center">
+                      <i class="fa-solid fa-circle-question text-purple-600 dark:text-purple-200"></i>
+                    </div>
+                    <div>
+                      <p class="font-semibold text-sm dark:text-white">Wahrheit / Pflicht</p>
+                      <p class="text-xs text-slate-400 font-light">Direkt im Chat</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              <input type="file" id="chat-image-input" accept="image/*" class="hidden" onchange="handleImageUpload(this,false)">
+              <input type="file" id="chat-image-once-input" accept="image/*" class="hidden" onchange="handleImageUpload(this,true)">
+            </div>
+
+            <input type="text" id="message-input"
+              class="flex-1 bg-slate-100/70 dark:bg-white/5 dark:text-white border border-transparent dark:border-white/10 rounded-full px-4 py-3 text-sm focus:ring-2 focus:ring-pastel-mint outline-none transition disabled:opacity-50 disabled:bg-slate-200 dark:disabled:bg-white/5 font-light"
+              placeholder="Nachricht..." autocomplete="off">
+
+            <button type="submit" id="btn-send"
+              class="bg-emerald-600/90 hover:bg-emerald-600 text-white w-10 h-10 rounded-full flex items-center justify-center transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed border border-white/10">
+              <i class="fa-solid fa-paper-plane text-sm"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div id="view-settings" class="hidden p-4 space-y-6 fade-in">
+        <div class="flex items-center gap-2 mb-4">
+          <button onclick="showView('dashboard')" class="p-2 -ml-2 text-slate-500 dark:text-slate-200/70">
+            <i class="fa-solid fa-arrow-left"></i>
+          </button>
+          <h2 class="text-xl font-semibold tracking-wide text-slate-800 dark:text-slate-100/90">Einstellungen</h2>
+        </div>
+
+        <section class="bg-white/80 dark:bg-ink-900/40 backdrop-blur-xl p-6 rounded-2xl border border-slate-200/70 dark:border-white/10 shadow-sm flex flex-col items-center gap-4">
+          <div class="relative group cursor-pointer" onclick="document.getElementById('avatar-upload').click()">
+            <img id="settings-avatar" src="" class="w-24 h-24 rounded-full object-cover border-4 border-slate-100 dark:border-white/10 bg-slate-200">
+            <div class="absolute inset-0 bg-black/30 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+              <i class="fa-solid fa-camera text-white text-xl"></i>
+            </div>
+            <input type="file" id="avatar-upload" accept="image/*" class="hidden" onchange="uploadAvatar(this)">
+          </div>
+
+          <div class="text-center w-full">
+            <div class="flex items-center justify-center gap-2 mb-2">
+              <h3 id="settings-name-display" class="font-semibold tracking-wide text-slate-800 dark:text-slate-100/90 text-lg">...</h3>
+              <button onclick="toggleNameEdit()" class="text-emerald-600 dark:text-pastel-mint text-xs">
+                <i class="fa-solid fa-pen"></i>
+              </button>
+            </div>
+
+            <div id="name-edit-container" class="hidden mt-2">
+              <input type="text" id="settings-name-input" class="w-full p-2 border border-slate-200 dark:border-white/10 rounded-lg bg-slate-50 dark:bg-white/5 dark:text-white font-light">
+              <div class="flex gap-2 mt-2">
+                <button onclick="saveName()" class="flex-1 bg-emerald-600/90 hover:bg-emerald-600 text-white py-2 rounded-xl text-sm font-semibold border border-white/10">Speichern</button>
+                <button onclick="toggleNameEdit()" class="flex-1 bg-slate-200/80 dark:bg-white/5 dark:hover:bg-white/10 py-2 rounded-xl text-sm font-semibold">Abbrechen</button>
+              </div>
+            </div>
+
+            <p id="settings-email" class="text-xs text-slate-500 dark:text-slate-200/60 mb-2 font-light">...</p>
+            <button onclick="document.getElementById('avatar-upload').click()" class="text-emerald-600 dark:text-pastel-mint text-xs font-semibold hover:underline">Foto ändern</button>
+          </div>
+        </section>
+
+        <!-- Labor -->
+        <section class="bg-white/80 dark:bg-ink-900/40 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/70 dark:border-white/10 shadow-sm">
+          <h3 class="font-semibold text-slate-700 dark:text-slate-200/80 mb-4 text-sm flex items-center gap-2">
+            <i class="fa-solid fa-flask text-purple-500"></i> Labor (Experimentelle Features)
+          </h3>
+          <p class="text-xs text-slate-500 dark:text-slate-200/60 mb-4 font-light">Diese Features funktionieren nur, wenn beide Freunde sie aktiviert haben.</p>
+
+          <div class="space-y-3">
+            <div class="flex items-center justify-between p-3 bg-slate-50/70 dark:bg-white/5 rounded-xl border border-slate-200/50 dark:border-white/10">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center">
+                  <i class="fa-solid fa-gamepad text-purple-600 dark:text-purple-200"></i>
+                </div>
+                <div>
+                  <p class="font-semibold text-sm dark:text-white">Minigames</p>
+                  <p class="text-xs text-slate-400 font-light">Würfeln, Schere-Stein-Papier, Wahrheit oder Pflicht</p>
+                </div>
+              </div>
+              <button id="toggle-minigames" onclick="toggleLabFeature('minigames')" class="w-12 h-6 bg-slate-200 rounded-full relative transition-colors">
+                <div class="w-4 h-4 bg-white rounded-full absolute top-1 left-1 transition-all shadow-sm"></div>
+              </button>
+            </div>
+
+            <div class="flex items-center justify-between p-3 bg-slate-50/70 dark:bg-white/5 rounded-xl border border-slate-200/50 dark:border-white/10">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                  <i class="fa-solid fa-terminal text-blue-600 dark:text-blue-200"></i>
+                </div>
+                <div>
+                  <p class="font-semibold text-sm dark:text-white">Chat-Befehle</p>
+                  <p class="text-xs text-slate-400 font-light">/würfel, /coin, /magic8, /rate</p>
+                </div>
+              </div>
+              <button id="toggle-chatCommands" onclick="toggleLabFeature('chatCommands')" class="w-12 h-6 bg-slate-200 rounded-full relative transition-colors">
+                <div class="w-4 h-4 bg-white rounded-full absolute top-1 left-1 transition-all shadow-sm"></div>
+              </button>
+            </div>
+
+            <div class="flex items-center justify-between p-3 bg-slate-50/70 dark:bg-white/5 rounded-xl border border-slate-200/50 dark:border-white/10">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center">
+                  <i class="fa-solid fa-face-laugh text-yellow-600 dark:text-yellow-200"></i>
+                </div>
+                <div>
+                  <p class="font-semibold text-sm dark:text-white">Nachrichten-Reaktionen</p>
+                  <p class="text-xs text-slate-400 font-light">👍 ❤️ 😂 auf Nachrichten</p>
+                </div>
+              </div>
+              <button id="toggle-reactions" onclick="toggleLabFeature('reactions')" class="w-12 h-6 bg-slate-200 rounded-full relative transition-colors">
+                <div class="w-4 h-4 bg-white rounded-full absolute top-1 left-1 transition-all shadow-sm"></div>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="bg-white/80 dark:bg-ink-900/40 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/70 dark:border-white/10 shadow-sm flex justify-between items-center">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-indigo-100 dark:bg-white/5 flex items-center justify-center text-indigo-500"><i class="fa-solid fa-moon"></i></div>
+            <span class="font-semibold text-slate-700 dark:text-slate-200/80 text-sm">Dunkelmodus</span>
+          </div>
+          <button onclick="toggleDarkMode()" id="btn-darkmode" class="w-12 h-6 bg-slate-200 dark:bg-white/10 rounded-full relative transition-colors">
+            <div class="w-4 h-4 bg-white rounded-full absolute top-1 left-1 dark:left-7 transition-all shadow-sm"></div>
+          </button>
+        </section>
+
+        <button onclick="handleLogout()" class="w-full py-3 text-red-600 dark:text-red-200 font-semibold bg-white/80 dark:bg-white/5 border border-red-100 dark:border-red-900/40 rounded-xl hover:bg-red-50/70 dark:hover:bg-red-900/15 mt-4">
+          Ausloggen
+        </button>
+      </div>
+    </main>
+
+    <!-- Friend Manage Modal -->
+    <div id="friend-manage-modal" class="hidden fixed inset-0 z-[78] bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+      <div class="bg-white/90 dark:bg-ink-900/70 backdrop-blur-xl w-full max-w-sm rounded-2xl p-6 shadow-2xl border border-slate-200/70 dark:border-white/10 animate-[fadeIn_0.2s]">
+        <div class="flex justify-between items-center mb-5">
+          <h3 class="font-semibold text-lg dark:text-white">Benutzer verwalten</h3>
+          <button onclick="closeFriendManage()" class="w-8 h-8 bg-slate-100/70 dark:bg-white/5 rounded-full text-slate-500 dark:text-slate-200/70">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="flex items-center gap-3 mb-4">
+          <img id="manage-friend-avatar" src="" class="w-12 h-12 rounded-full object-cover bg-slate-200 border border-slate-200/70 dark:border-white/10">
+          <div class="min-w-0">
+            <p id="manage-friend-name" class="font-semibold dark:text-white truncate">...</p>
+            <p id="manage-friend-meta" class="text-xs text-slate-500 dark:text-slate-200/60 truncate font-light">...</p>
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <div class="p-3 bg-slate-50/70 dark:bg-white/5 rounded-xl border border-slate-200/50 dark:border-white/10">
+            <label class="block text-xs font-semibold text-slate-600 dark:text-slate-200/80 mb-2">Anzeigename (Alias) – nur bei dir sichtbar</label>
+            <div class="flex gap-2">
+              <input id="manage-friend-alias" type="text" placeholder="z.B. Schichtleiter A"
+                class="flex-1 p-3 border border-slate-200 dark:border-white/10 rounded-xl bg-white/70 dark:bg-white/5 dark:text-white text-sm focus:ring-2 focus:ring-pastel-mint outline-none font-light">
+              <button onclick="saveFriendAlias()" class="px-4 rounded-xl bg-emerald-600/90 hover:bg-emerald-600 text-white font-semibold transition border border-white/10">Speichern</button>
+            </div>
+            <p class="text-[11px] text-slate-500 dark:text-slate-200/60 mt-2 font-light">Tipp: Alias ist ideal für interne Bezeichnungen (ohne den echten Namen zu ändern).</p>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btn-pin-friend" onclick="togglePinFriend()" class="py-3 rounded-xl font-semibold border border-slate-200/70 dark:border-white/10 bg-white/80 dark:bg-white/5 text-slate-700 dark:text-slate-200/80 hover:border-emerald-200 hover:text-emerald-600 transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-thumbtack"></i><span>Pin</span>
+            </button>
+            <button id="btn-mute-friend" onclick="toggleMuteManagedFriend()" class="py-3 rounded-xl font-semibold border border-slate-200/70 dark:border-white/10 bg-white/80 dark:bg-white/5 text-slate-700 dark:text-slate-200/80 hover:border-emerald-200 hover:text-emerald-600 transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-volume-xmark"></i><span>Stumm</span>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btn-block-friend" onclick="toggleBlockManagedFriend()" class="py-3 rounded-xl font-semibold border border-red-200 dark:border-red-900/40 bg-red-50/70 dark:bg-red-900/15 text-red-600 dark:text-red-200 hover:bg-red-100/70 dark:hover:bg-red-900/25 transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-ban"></i><span>Blockieren</span>
+            </button>
+            <button id="btn-remove-friend" onclick="removeManagedFriend()" class="py-3 rounded-xl font-semibold border border-slate-200/70 dark:border-white/10 bg-white/80 dark:bg-white/5 text-slate-700 dark:text-slate-200/80 hover:bg-slate-50/70 dark:hover:bg-white/10 transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-user-slash"></i><span>Entfernen</span>
+            </button>
+          </div>
+
+          <button onclick="closeFriendManage()" class="w-full py-3 rounded-xl font-semibold bg-slate-100/70 dark:bg-white/5 text-slate-700 dark:text-slate-200/80 hover:bg-slate-200/70 dark:hover:bg-white/10 transition">
+            Schliessen
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Friend Settings Modal -->
+    <div id="friend-settings-modal" class="hidden fixed inset-0 z-[75] bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+      <div class="bg-white/90 dark:bg-ink-900/70 backdrop-blur-xl w-full max-w-sm rounded-2xl p-6 shadow-2xl border border-slate-200/70 dark:border-white/10 animate-[fadeIn_0.2s]">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="font-semibold text-lg dark:text-white">Freund-Einstellungen</h3>
+          <button onclick="closeFriendSettings()" class="w-8 h-8 bg-slate-100/70 dark:bg-white/5 rounded-full text-slate-500 dark:text-slate-200/70"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="space-y-4">
+          <div class="flex items-center justify-between p-3 bg-slate-50/70 dark:bg-white/5 rounded-xl border border-slate-200/50 dark:border-white/10">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/25 text-emerald-600 dark:text-pastel-mint rounded-full flex items-center justify-center"><i class="fa-solid fa-fire"></i></div>
+              <div>
+                <p class="font-semibold text-sm dark:text-white">Spam-Modus</p>
+                <p class="text-xs text-slate-400 font-light">Erlaubt endloses Schreiben</p>
+              </div>
+            </div>
+            <button id="btn-spam-toggle" onclick="toggleSpamMode()" class="w-12 h-6 bg-slate-200 rounded-full relative transition-colors">
+              <div class="w-4 h-4 bg-white rounded-full absolute top-1 left-1 transition-all shadow-sm"></div>
+            </button>
+          </div>
+          <p class="text-xs text-center text-slate-500 dark:text-slate-200/60 italic font-light mt-2">Beide Nutzer muessen zustimmen.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Minigame Menu -->
+    <div id="minigame-menu" class="hidden fixed bottom-20 right-4 z-40 bg-white/90 dark:bg-ink-900/70 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/70 dark:border-white/10 overflow-hidden w-56">
+      <div class="p-4 border-b border-slate-200/70 dark:border-white/10">
+        <h3 class="font-semibold dark:text-white flex items-center gap-2"><i class="fa-solid fa-gamepad text-purple-500"></i> Minigames</h3>
+        <p class="text-xs text-slate-500 dark:text-slate-200/60 font-light">Wähle ein Spiel</p>
+      </div>
+      <div class="p-2">
+        <button onclick="startMinigame('dice')" class="w-full text-left p-3 rounded-lg hover:bg-slate-50/70 dark:hover:bg-white/5 flex items-center gap-3 transition">
+          <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center"><i class="fa-solid fa-dice text-blue-600 dark:text-blue-200"></i></div>
+          <div><p class="font-semibold text-sm dark:text-white">Würfeln</p><p class="text-xs text-slate-400 font-light">Wer hat die höhere Zahl?</p></div>
+        </button>
+
+        <button onclick="startMinigame('rps')" class="w-full text-left p-3 rounded-lg hover:bg-slate-50/70 dark:hover:bg-white/5 flex items-center gap-3 transition">
+          <div class="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center"><i class="fa-solid fa-hand-fist text-red-600 dark:text-red-200"></i></div>
+          <div><p class="font-semibold text-sm dark:text-white">Schere-Stein-Papier</p><p class="text-xs text-slate-400 font-light">Klassiker</p></div>
+        </button>
+
+        <button onclick="startMinigame('truth')" class="w-full text-left p-3 rounded-lg hover:bg-slate-50/70 dark:hover:bg-white/5 flex items-center gap-3 transition">
+          <div class="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/25 rounded-full flex items-center justify-center"><i class="fa-solid fa-question text-emerald-600 dark:text-pastel-mint"></i></div>
+          <div><p class="font-semibold text-sm dark:text-white">Wahrheit oder Pflicht</p><p class="text-xs text-slate-400 font-light">Zufällige Herausforderung</p></div>
+        </button>
+
+        <button onclick="startMinigame('coin')" class="w-full text-left p-3 rounded-lg hover:bg-slate-50/70 dark:hover:bg-white/5 flex items-center gap-3 transition">
+          <div class="w-10 h-10 bg-yellow-100 dark:bg-yellow-900/25 rounded-full flex items-center justify-center"><i class="fa-solid fa-coins text-yellow-600 dark:text-yellow-200"></i></div>
+          <div><p class="font-semibold text-sm dark:text-white">Münzwurf</p><p class="text-xs text-slate-400 font-light">Kopf oder Zahl?</p></div>
+        </button>
+
+        <button onclick="startMinigame('number')" class="w-full text-left p-3 rounded-lg hover:bg-slate-50/70 dark:hover:bg-white/5 flex items-center gap-3 transition">
+          <div class="w-10 h-10 bg-purple-100 dark:bg-purple-900/25 rounded-full flex items-center justify-center"><i class="fa-solid fa-hashtag text-purple-600 dark:text-purple-200"></i></div>
+          <div><p class="font-semibold text-sm dark:text-white">Zahlen raten</p><p class="text-xs text-slate-400 font-light">Rate die Zahl 1-10</p></div>
+        </button>
+      </div>
+    </div>
+
+    <!-- Minigame Modal -->
+    <div id="minigame-modal" class="hidden fixed inset-0 z-[85] bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
+      <div id="minigame-content" class="bg-white/90 dark:bg-ink-900/70 backdrop-blur-xl w-full max-w-sm rounded-2xl p-6 shadow-2xl border border-slate-200/70 dark:border-white/10 animate-[fadeIn_0.3s]"></div>
+    </div>
+
+    <!-- Incoming Call Modal -->
+    <div id="incoming-call-modal" class="hidden fixed inset-0 z-[85] bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
+      <div class="bg-white/90 dark:bg-ink-900/70 backdrop-blur-xl w-full max-w-sm rounded-2xl p-6 shadow-2xl border border-slate-200/70 dark:border-white/10 animate-[fadeIn_0.3s] text-center">
+        <div class="w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-900/25 flex items-center justify-center mx-auto mb-4">
+          <i class="fa-solid fa-video text-emerald-600 dark:text-pastel-mint text-3xl"></i>
+        </div>
+        <h3 class="font-semibold text-xl dark:text-white mb-1">Eingehender Videoanruf</h3>
+        <p id="caller-name" class="text-slate-600 dark:text-slate-200/70 mb-6 font-light">Von ...</p>
+        <div class="flex gap-4">
+          <button onclick="declineIncomingCall()" class="flex-1 py-3 bg-red-500/90 hover:bg-red-500 text-white rounded-xl font-semibold transition border border-white/10">
+            <i class="fa-solid fa-phone-slash mr-2"></i>Ablehnen
+          </button>
+          <button onclick="acceptIncomingCall()" class="flex-1 py-3 bg-emerald-600/90 hover:bg-emerald-600 text-white rounded-xl font-semibold transition border border-white/10">
+            <i class="fa-solid fa-phone mr-2"></i>Annehmen
+          </button>
+        </div>
+        <p class="text-xs text-slate-500 dark:text-slate-200/60 mt-4 font-light">Der Anruf wird automatisch abgelehnt, wenn du nicht antwortest.</p>
+      </div>
+    </div>
+
+    <!-- Image Modal -->
+    <div id="image-modal" class="fixed inset-0 z-[60] bg-black/95 hidden flex items-center justify-center p-4 backdrop-blur-sm" onclick="handleImageModalClick()">
+      <img id="modal-img" src="" class="max-w-full max-h-full rounded shadow-2xl object-contain">
+      <button class="absolute top-4 right-4 text-white text-2xl p-4 hover:text-pastel-mint transition"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <!-- Video Overlay -->
+    <div id="video-overlay" class="fixed inset-0 z-[70] bg-ink-950 hidden flex flex-col">
+      <div class="relative flex-1 bg-black">
+        <video id="remote-video" autoplay playsinline class="w-full h-full object-cover"></video>
+        <video id="local-video" autoplay playsinline muted class="absolute bottom-24 right-4 w-32 h-48 bg-ink-900 rounded-xl border-2 border-white/15 shadow-lg object-cover"></video>
+        <div id="call-status" class="absolute top-8 left-0 right-0 text-center text-white font-semibold drop-shadow-md bg-black/30 py-1">Verbinde...</div>
+      </div>
+      <div class="h-24 bg-ink-950 flex items-center justify-center gap-8 pb-4">
+        <button onclick="toggleAudio()" id="btn-audio" class="w-14 h-14 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/15 transition border border-white/10"><i class="fa-solid fa-microphone text-xl"></i></button>
+        <button onclick="endVideoCall()" class="w-16 h-16 rounded-full bg-red-500/90 text-white flex items-center justify-center hover:bg-red-500 shadow-lg shadow-red-500/25 transition transform hover:scale-105 border border-white/10"><i class="fa-solid fa-phone-slash text-2xl"></i></button>
+        <button onclick="toggleVideo()" id="btn-video" class="w-14 h-14 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/15 transition border border-white/10"><i class="fa-solid fa-video text-xl"></i></button>
+      </div>
+    </div>
+
+    <!-- Fake Screen: Post-it Board (nur via Keywords) -->
+    <div id="fake-screen" class="hidden fixed inset-0 z-[90] bg-slate-100 dark:bg-ink-950">
+      <div class="max-w-md mx-auto h-[100dvh] flex flex-col">
+        <div class="p-4 border-b border-slate-200/70 dark:border-white/10 bg-white/80 dark:bg-ink-900/40 backdrop-blur-xl">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <i class="fa-solid fa-note-sticky text-amber-500"></i>
+              <h2 class="font-semibold tracking-wide text-slate-800 dark:text-slate-100/90">Notizen</h2>
+            </div>
+            <button onclick="addPostit()" class="px-3 py-2 rounded-xl bg-amber-500/90 hover:bg-amber-500 text-white text-sm font-semibold border border-white/10">
+              + Post-it
+            </button>
+          </div>
+          <p class="text-xs text-slate-500 dark:text-slate-200/60 font-light mt-2">
+            Im Chat: <b>postit</b> öffnen · <b>pingpong</b> zurück (Keywords werden nicht gesendet)
+          </p>
+        </div>
+        <div id="postit-board" class="flex-1 overflow-y-auto p-4 grid grid-cols-2 gap-3"></div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-ink-900 text-white px-4 py-2 rounded-full text-sm shadow-lg opacity-0 transition-opacity duration-300 pointer-events-none z-[80] flex items-center gap-2 border border-white/10">
+      <span id="toast-icon"></span><span id="toast-msg">Nachricht</span>
+    </div>
+  </div>
+
+  <!-- Init Guard -->
+  <script>
+    (function(){
+      function show(msg, detail){
+        try {
+          var lt = document.getElementById('loading-text');
+          if (lt) lt.textContent = msg;
+          var box = document.getElementById('loading-error-detail');
+          if (box) box.textContent = detail || '';
+          var actions = document.getElementById('loading-actions');
+          if (actions) actions.classList.remove('hidden');
+          var ls = document.getElementById('loading-screen');
+          if (ls) ls.classList.remove('hidden');
+        } catch(_) {}
+      }
+
+      window.addEventListener('error', function(e){
+        var m = (e && e.message) ? e.message : 'Unbekannter JS-Fehler';
+        show('Init-Fehler: JavaScript konnte nicht starten', m);
+      });
+
+      window.addEventListener('unhandledrejection', function(e){
+        var r = (e && e.reason) ? (e.reason.message || String(e.reason)) : 'Unbekannte Promise-Rejection';
+        show('Init-Fehler: Promise-Rejection', r);
+      });
+
+      setTimeout(function(){
+        var lt = document.getElementById('loading-text');
+        if (lt && (lt.textContent || '').trim() === 'Initialisiere...') {
+          show(
+            'Init blockiert: Firebase-Scripts nicht geladen',
+            'Typisch: kein Internet / gstatic blockiert / Cordova-Whitelist.\n\nMassnahme: Internet prüfen, im Cordova/Capacitor Whitelist Zugriff auf https://www.gstatic.com erlauben.'
+          );
+        }
+      }, 2500);
+    })();
+  </script>
+
+  <script>
+    // Firebase compat (works on file:// & Cordova)
+    // Required scripts loaded in <head>
+
+    // --- Firestore v9-style helpers on compat ---
+    function doc(db, ...segs) { return db.doc(segs.join('/')); }
+    function collection(db, ...segs) { return db.collection(segs.join('/')); }
+
+    function where(field, op, value) { return { t: 'where', field, op, value }; }
+    function orderBy(field, dir = 'asc') { return { t: 'orderBy', field, dir }; }
+    function limit(n) { return { t: 'limit', n }; }
+    function startAfter(snapshotOrValue) { return { t: 'startAfter', snapshotOrValue }; }
+
+    function query(base, ...constraints) {
+      let q = base;
+      for (const c of constraints) {
+        if (!c) continue;
+        if (c.t === 'where') q = q.where(c.field, c.op, c.value);
+        else if (c.t === 'orderBy') q = q.orderBy(c.field, c.dir);
+        else if (c.t === 'limit') q = q.limit(c.n);
+        else if (c.t === 'startAfter') {
+          const v = c.snapshotOrValue;
+          q = q.startAfter(v?.__raw || v);
+        }
+      }
+      return q;
+    }
+
+    function serverTimestamp() { return firebase.firestore.FieldValue.serverTimestamp(); }
+    function arrayUnion(...vals) { return firebase.firestore.FieldValue.arrayUnion(...vals); }
+    function arrayRemove(...vals) { return firebase.firestore.FieldValue.arrayRemove(...vals); }
+    function deleteField() { return firebase.firestore.FieldValue.delete(); }
+
+    async function getDoc(ref) {
+      const s = await ref.get();
+      return {
+        __raw: s,
+        id: s.id,
+        ref: s.ref,
+        exists: () => s.exists,
+        data: () => s.data()
+      };
+    }
+
+    async function getDocs(q) {
+      const qs = await q.get();
+      return {
+        __raw: qs,
+        empty: qs.empty,
+        size: qs.size,
+        docs: qs.docs.map(d => ({
+          __raw: d,
+          id: d.id,
+          ref: d.ref,
+          data: () => d.data()
+        })),
+        forEach: (fn) => qs.forEach(d => fn({
+          __raw: d,
+          id: d.id,
+          ref: d.ref,
+          data: () => d.data()
+        }))
+      };
+    }
+
+    function setDoc(ref, data, opts) { return ref.set(data, opts?.merge ? { merge: true } : undefined); }
+    function updateDoc(ref, data) { return ref.update(data); }
+    function deleteDoc(ref) { return ref.delete(); }
+
+    // addDoc wrapper for compat: returns {id, ref}
+    async function addDoc(colRef, data) {
+      const ref = await colRef.add(data);
+      return { id: ref.id, ref };
+    }
+
+    function onSnapshot(refOrQuery, cb, errCb) {
+      return refOrQuery.onSnapshot((snap) => {
+        // Query snapshot
+        if (snap && Array.isArray(snap.docs)) {
+          cb({
+            __raw: snap,
+            empty: snap.empty,
+            size: snap.size,
+            docChanges: () => snap.docChanges().map(ch => ({
+              type: ch.type,
+              doc: {
+                __raw: ch.doc,
+                id: ch.doc.id,
+                ref: ch.doc.ref,
+                data: () => ch.doc.data()
+              }
+            })),
+            docs: snap.docs.map(d => ({
+              __raw: d,
+              id: d.id,
+              ref: d.ref,
+              data: () => d.data()
+            })),
+            forEach: (fn) => snap.forEach(d => fn({
+              __raw: d,
+              id: d.id,
+              ref: d.ref,
+              data: () => d.data()
+            }))
+          });
+          return;
+        }
+        // Document snapshot
+        cb({
+          __raw: snap,
+          id: snap.id,
+          ref: snap.ref,
+          exists: () => snap.exists,
+          data: () => snap.data()
+        });
+      }, errCb);
+    }
+
+    // --- Auth v9-style helpers on compat ---
+    const signInWithEmailAndPassword = (auth, email, password) => auth.signInWithEmailAndPassword(email, password);
+    const createUserWithEmailAndPassword = (auth, email, password) => auth.createUserWithEmailAndPassword(email, password);
+    const onAuthStateChanged = (auth, cb) => auth.onAuthStateChanged(cb);
+    const signOut = (auth) => auth.signOut();
+    const updateProfile = (user, data) => user.updateProfile(data);
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAkLwNUC9M_JaUwZ7HvN2EeDNRIMqv9u5M",
+      authDomain: "pingpong-rai.firebaseapp.com",
+      projectId: "pingpong-rai",
+      storageBucket: "pingpong-rai.firebasestorage.app",
+      messagingSenderId: "313645697376",
+      appId: "1:313645697376:web:4e73073dafcdabd03e7605"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+
+    const auth = firebase.auth();
+    // Persist login in WebView/Cordova
+    auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(console.warn);
+
+    const db = firebase.firestore();
+    const appId = 'default-app';
+
+    let currentUser = null, userProfile = null, currentView = 'dashboard';
+    let activeChatId = null, activeChatPartner = null;
+    let unsubFriends, unsubIncoming, unsubOutgoing, unsubChat, unsubProfile, unsubCall, unsubChatMeta, unsubPartnerProfile;
+    let isRegisterMode = false, presenceInterval = null;
+    let incomingCallData = null;
+
+    // --- Fake Screen / Post-its (localStorage) ---
+    const POSTIT_KEY = 'pp_postits_v1';
+
+    function loadPostits() {
+      try { return JSON.parse(localStorage.getItem(POSTIT_KEY) || '[]'); }
+      catch { return []; }
+    }
+    function savePostits(items) { localStorage.setItem(POSTIT_KEY, JSON.stringify(items || [])); }
+
+    function renderPostits() {
+      const board = document.getElementById('postit-board');
+      if(!board) return;
+
+      const items = loadPostits();
+      board.innerHTML = '';
+
+      if(items.length === 0) {
+        board.innerHTML = `
+          <div class="col-span-2 text-center text-slate-400 dark:text-slate-200/40 text-sm font-light py-12">
+            Noch keine Post-its. Tippe auf “+ Post-it”.
+          </div>
+        `;
+        return;
+      }
+
+      items.forEach((it, idx) => {
+        const color = it.color || 'amber';
+        const bg =
+          color === 'mint'  ? 'bg-emerald-100 dark:bg-emerald-900/25' :
+          color === 'lilac' ? 'bg-purple-100 dark:bg-purple-900/25' :
+          color === 'sky'   ? 'bg-sky-100 dark:bg-sky-900/25' :
+                              'bg-amber-100 dark:bg-amber-900/25';
+
+        const el = document.createElement('div');
+        el.className = `${bg} border border-black/5 dark:border-white/10 rounded-2xl p-3 shadow-sm relative`;
+        el.innerHTML = `
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-[11px] text-slate-600 dark:text-slate-200/70 font-semibold">Post-it</span>
+            <button class="w-8 h-8 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-200/70"
+                    onclick="removePostit(${idx})" title="Löschen">
+              <i class="fa-solid fa-trash text-xs"></i>
+            </button>
+          </div>
+
+          <textarea class="w-full min-h-[110px] resize-none bg-transparent outline-none text-slate-800 dark:text-slate-100/90 font-light text-sm"
+                    placeholder="Notiz..."
+                    oninput="updatePostitText(${idx}, this.value)">${(it.text || '').replace(/</g,'&lt;')}</textarea>
+
+          <div class="mt-2 flex gap-2">
+            <button onclick="setPostitColor(${idx}, 'amber')" class="w-5 h-5 rounded-full bg-amber-400 border border-white/40"></button>
+            <button onclick="setPostitColor(${idx}, 'mint')"  class="w-5 h-5 rounded-full bg-emerald-400 border border-white/40"></button>
+            <button onclick="setPostitColor(${idx}, 'sky')"   class="w-5 h-5 rounded-full bg-sky-400 border border-white/40"></button>
+            <button onclick="setPostitColor(${idx}, 'lilac')" class="w-5 h-5 rounded-full bg-purple-400 border border-white/40"></button>
+          </div>
+        `;
+        board.appendChild(el);
+      });
+    }
+
+    window.addPostit = () => {
+      const items = loadPostits();
+      items.unshift({ text: '', color: 'amber', createdAt: Date.now() });
+      savePostits(items);
+      renderPostits();
+    };
+    window.removePostit = (idx) => {
+      const items = loadPostits();
+      items.splice(idx, 1);
+      savePostits(items);
+      renderPostits();
+    };
+    window.updatePostitText = (idx, text) => {
+      const items = loadPostits();
+      if(!items[idx]) return;
+      items[idx].text = text;
+      savePostits(items);
+    };
+    window.setPostitColor = (idx, color) => {
+      const items = loadPostits();
+      if(!items[idx]) return;
+      items[idx].color = color;
+      savePostits(items);
+      renderPostits();
+    };
+
+    function showFakeScreen() {
+      renderPostits();
+      document.getElementById('fake-screen').classList.remove('hidden');
+    }
+    function hideFakeScreen() {
+      document.getElementById('fake-screen').classList.add('hidden');
+    }
+    function isFakeScreenVisible() {
+      const fs = document.getElementById('fake-screen');
+      return fs && !fs.classList.contains('hidden');
+    }
+
+    // --- PingPong Turn Lock UI (readOnly statt disabled, damit Keyboard nicht sofort verschwindet) ---
+    function setTurnLockUI(locked) {
+      const inp = document.getElementById('message-input');
+      const btn = document.getElementById('btn-send');
+      const hint = document.getElementById('turn-lock-hint');
+      const hintName = document.getElementById('turn-lock-name');
+      if(!inp || !btn || !hint || !hintName) return;
+
+      if(locked) {
+        inp.readOnly = true;
+        btn.disabled = true;
+        hintName.textContent = activeChatPartner?.name || 'Kontakt';
+        hint.classList.remove('hidden');
+      } else {
+        inp.readOnly = false;
+        btn.disabled = false;
+        hint.classList.add('hidden');
+      }
+    }
+
+    // --- Init/Diagnose ---
+    const __initLog = [];
+    function initStep(s) {
+      const ts = new Date().toISOString();
+      __initLog.push(`[${ts}] ${s}`);
+      try { document.getElementById('loading-text').innerText = s; } catch(_) {}
+    }
+
+    function showInitError(context, err) {
+      console.error(err);
+      const code = err?.code || '';
+      const msg = err?.message || String(err);
+      initStep(`Init-Fehler: ${context}${code ? ` (${code})` : ''}`);
+      const box = document.getElementById('loading-error-detail');
+      const actions = document.getElementById('loading-actions');
+
+      if (box) box.textContent = `${context}
+${code ? `Code: ${code}
+` : ''}${msg}
+
+Projekt: ${firebaseConfig.projectId}
+AppId: ${appId}`;
+
+      if (actions) actions.classList.remove('hidden');
+
+      // Fail-safe: show auth screen so user can continue
+      document.getElementById('auth-screen').classList.remove('hidden');
+      document.getElementById('main-header').classList.add('hidden');
+      document.getElementById('main-content').classList.add('hidden');
+    }
+
+    window.copyInitLog = async () => {
+      const text = __initLog.join('\n');
+      try { await navigator.clipboard.writeText(text); showToast('Diagnose kopiert', 'success'); }
+      catch { showToast('Konnte nicht kopieren', 'error'); }
+    };
+    window.forceLogout = async () => { try { await signOut(auth); } catch(_) {} };
+
+    // --- Minigame Daten ---
+    const truthQuestions = [
+      "Was ist das Peinlichste, was dir je passiert ist?",
+      "Wen hast du zuletzt angelogen und warum?",
+      "Was ist dein grösstes Geheimnis?",
+      "Welche Celebrity-Crush hast du?",
+      "Was ist das Dümmste, wofür du je Geld ausgegeben hast?",
+      "Hast du je etwas gestohlen?",
+      "Was ist deine schlimmste Angewohnheit?",
+      "Auf welchen Social-Media-Star bist du neidisch?",
+      "Was war dein schlimmstes Date?",
+      "Was ist das Seltsamste, das du je gegessen hast?"
+    ];
+
+    const dareChallenges = [
+      "Mach 10 Liegestütze und schick ein Video davon",
+      "Ruf jemanden an und sing ihm ein Happy Birthday",
+      "Poste ein peinliches Babyfoto für 5 Minuten",
+      "Ess einen Löffel Salz oder Zucker (deine Wahl)",
+      "Mach einen TikTok-Tanz und schick ihn",
+      "Sprich für die nächsten 5 Nachrichten wie ein Pirat",
+      "Ändere deinen Profilnamen zu etwas Lächerlichem für 1 Stunde",
+      "Schick das letzte Foto aus deiner Galerie (ohne es vorher zu checken)",
+      "Mach 20 Kniebeugen sofort",
+      "Schreibe deine nächste Nachricht mit geschlossenen Augen"
+    ];
+
+    // --- Utils ---
+    const resizeImage = (file, maxWidth=800) => {
+      return new Promise((resolve)=>{
+        const reader = new FileReader();
+        reader.onload = (e)=>{
+          const img = new Image();
+          img.onload=()=>{
+            const c = document.createElement('canvas');
+            let w=img.width, h=img.height;
+            if(w>maxWidth){ h=Math.round((h*maxWidth)/w); w=maxWidth; }
+            c.width=w; c.height=h;
+            c.getContext('2d').drawImage(img,0,0,w,h);
+            resolve(c.toDataURL('image/jpeg',0.7));
+          };
+          img.src=e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    };
+
+    function generateFingerprintCode(email) {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let hash = 0;
+      for (let i = 0; i < email.length; i++) {
+        hash = ((hash << 5) - hash) + email.charCodeAt(i);
+        hash = hash & hash;
+      }
+      hash = Math.abs(hash);
+
+      let code = '';
+      for (let i = 0; i < 4; i++) {
+        const index = (hash + i * 13) % chars.length;
+        code += chars[index];
+        hash = (hash * 1664525 + 1013904223) % (2**32);
+      }
+      return code;
+    }
+
+    function generateRandomCode() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let out = '';
+      for (let i = 0; i < 4; i++) out += chars[Math.floor(Math.random() * chars.length)];
+      return out;
+    }
+
+    window.toggleDarkMode = () => {
+      const html = document.documentElement;
+      localStorage.setItem('theme', html.classList.toggle('dark') ? 'dark' : 'light');
+    };
+    if(localStorage.getItem('theme') === 'dark') document.documentElement.classList.add('dark');
+
+    // --- Auth ---
+    window.toggleAuthMode = () => {
+      isRegisterMode = !isRegisterMode;
+      document.getElementById('input-email').value = '';
+      document.getElementById('input-password').value = '';
+      document.getElementById('auth-error-box').classList.add('hidden');
+      document.getElementById('field-name').classList.toggle('hidden', !isRegisterMode);
+      document.getElementById('btn-submit').innerText = isRegisterMode ? "Registrieren" : "Einloggen";
+      document.getElementById('text-toggle-msg').innerText = isRegisterMode ? "Bereits ein Konto?" : "Noch kein Konto?";
+      document.getElementById('btn-toggle').innerText = isRegisterMode ? "Einloggen" : "Jetzt registrieren";
+    };
+
+    window.handleAuthAction = async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('input-email').value.trim();
+      const password = document.getElementById('input-password').value.trim();
+      const btn = document.getElementById('btn-submit');
+
+      if(!email || !password) return showError("Bitte alle Felder ausfüllen.");
+      btn.disabled = true; btn.innerText = "Verarbeite...";
+
+      try {
+        if(isRegisterMode) {
+          const name = document.getElementById('input-name').value.trim();
+          if(!name) throw new Error("Bitte Nicknamen eingeben");
+          const cred = await createUserWithEmailAndPassword(auth, email, password);
+          await updateProfile(cred.user, { displayName: name });
+          await ensureUserProfile(cred.user, name, email);
+          showToast("Willkommen "+name, 'success');
+        } else {
+          await signInWithEmailAndPassword(auth, email, password);
+          showToast("Willkommen zurück", 'success');
+        }
+      } catch(err) {
+        console.error(err);
+        let msg = err.message;
+        if(err.code === 'auth/email-already-in-use') msg="E-Mail belegt";
+        if(err.code === 'auth/invalid-credential') msg="Falsche Daten";
+        showError(msg);
+        btn.disabled = false;
+        btn.innerText = isRegisterMode ? "Registrieren" : "Einloggen";
+      }
+    };
+
+    function showError(m) {
+      const b=document.getElementById('auth-error-box');
+      b.innerText=m;
+      b.classList.remove('hidden');
+    }
+
+    onAuthStateChanged(auth, async (u) => {
+      initStep('Auth-Status prüfen...');
+      if(u) {
+        currentUser = u;
+        initStep('Angemeldet. Profil wird geladen...');
+        document.getElementById('auth-screen').classList.add('hidden');
+        document.getElementById('loading-screen').classList.remove('hidden');
+        await checkUserProfile();
+        startPresence();
+      } else {
+        currentUser = null;
+        userProfile = null;
+        cleanup();
+        initStep('Nicht angemeldet. Login anzeigen...');
+        document.getElementById('loading-screen').classList.add('hidden');
+        document.getElementById('auth-screen').classList.remove('hidden');
+        document.getElementById('main-header').classList.add('hidden');
+        document.getElementById('main-content').classList.add('hidden');
+      }
+    });
+
+    async function checkUserProfile() {
+      try {
+        initStep('Profilzugriff (users) ...');
+        const ref = doc(db, 'artifacts', appId, 'users', currentUser.uid);
+        let snap = await getDoc(ref);
+        if(!snap.exists()) {
+          initStep('Profil fehlt. Erstelle Profil + Code ...');
+          const user = auth.currentUser;
+          await ensureUserProfile(user, user.displayName || "User", user.email);
+          initStep('Profil erneut laden ...');
+          snap = await getDoc(ref);
+        }
+        userProfile = snap.data();
+        initStep('Profil OK. App startet ...');
+        startApp();
+      } catch(e) {
+        showInitError('Profilzugriff blockiert', e);
+        document.getElementById('loading-screen').classList.remove('hidden');
+      }
+    }
+
+    async function ensureUserProfile(user, name, email) {
+      let code = generateFingerprintCode(email);
+      const codesColPath = ['artifacts', appId, 'public', 'data', 'codes'];
+
+      async function claimCode(candidate) {
+        const codeRef = doc(db, ...codesColPath, candidate);
+        const snap = await getDoc(codeRef);
+        if (snap.exists()) {
+          const existing = snap.data();
+          if (existing && existing.uid === user.uid) return true;
+          return false;
+        }
+        await setDoc(codeRef, { uid: user.uid, email }, { merge: false });
+        return true;
+      }
+
+      try {
+        initStep('Code-Mapping (codes) ...');
+        let ok = await claimCode(code);
+
+        if (!ok) {
+          initStep('Code-Kollision. Suche Alternativ-Code ...');
+          for (let i = 0; i < 25; i++) {
+            const cand = generateRandomCode();
+            if (await claimCode(cand)) { code = cand; ok = true; break; }
+          }
+        }
+
+        if (!ok) throw new Error('Konnte keinen freien Code erzeugen');
+
+        initStep('Profil speichern (users) ...');
+        await setDoc(doc(db, 'artifacts', appId, 'users', user.uid), {
+          uid: user.uid,
+          name: name,
+          email: email,
+          friendCode: code,
+          avatar: null,
+          createdAt: serverTimestamp(),
+          settings: {
+            blocked: [],
+            muted: [],
+            lab: { minigames: false, chatCommands: false, reactions: false }
+          },
+          lastSeen: serverTimestamp(),
+          online: false
+        }, { merge: true });
+
+      } catch (e) {
+        showInitError('Profil/Code konnte nicht gespeichert werden', e);
+        throw e;
+      }
+    }
+
+    // --- Name ändern ---
+    window.toggleNameEdit = () => {
+      const display = document.getElementById('settings-name-display');
+      const editContainer = document.getElementById('name-edit-container');
+      const input = document.getElementById('settings-name-input');
+
+      if(editContainer.classList.contains('hidden')) {
+        input.value = display.textContent;
+        editContainer.classList.remove('hidden');
+        display.classList.add('hidden');
+      } else {
+        editContainer.classList.add('hidden');
+        display.classList.remove('hidden');
+      }
+    };
+
+    window.saveName = async () => {
+      const newName = document.getElementById('settings-name-input').value.trim();
+      if(!newName) { showToast("Name darf nicht leer sein", "error"); return; }
+      if(newName === userProfile.name) { toggleNameEdit(); return; }
+
+      try {
+        await updateProfile(auth.currentUser, { displayName: newName });
+        await updateDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid), { name: newName });
+        userProfile.name = newName;
+        updateUIFromProfile();
+        showToast("Name geändert", "success");
+        toggleNameEdit();
+      } catch(error) {
+        console.error("Error updating name:", error);
+        showToast("Fehler beim Ändern des Namens", "error");
+      }
+    };
+
+    // --- Labor Features ---
+    window.toggleLabFeature = async (feature) => {
+      if(!userProfile || !userProfile.settings) return;
+      const currentValue = userProfile.settings.lab?.[feature] || false;
+      const newValue = !currentValue;
+
+      const button = document.getElementById(`toggle-${feature}`);
+      if(button) {
+        if(newValue) {
+          button.classList.remove('bg-slate-200');
+          button.classList.add('bg-emerald-500');
+          button.querySelector('div').classList.add('translate-x-6');
+        } else {
+          button.classList.add('bg-slate-200');
+          button.classList.remove('bg-emerald-500');
+          button.querySelector('div').classList.remove('translate-x-6');
+        }
+      }
+
+      try {
+        await updateDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid), {
+          [`settings.lab.${feature}`]: newValue
+        });
+
+        showToast(`${feature} ${newValue ? 'aktiviert' : 'deaktiviert'}`, "success");
+        if(!userProfile.settings.lab) userProfile.settings.lab = {};
+        userProfile.settings.lab[feature] = newValue;
+
+        if(feature === 'minigames' && activeChatPartner) updateMinigameButtonVisibility();
+      } catch(error) {
+        console.error("Error toggling lab feature:", error);
+        showToast("Fehler beim Ändern der Einstellung", "error");
+
+        if(button) {
+          if(currentValue) {
+            button.classList.remove('bg-slate-200');
+            button.classList.add('bg-emerald-500');
+            button.querySelector('div').classList.add('translate-x-6');
+          } else {
+            button.classList.add('bg-slate-200');
+            button.classList.remove('bg-emerald-500');
+            button.querySelector('div').classList.remove('translate-x-6');
+          }
+        }
+      }
+    };
+
+    function updateLabUI() {
+      if(!userProfile || !userProfile.settings || !userProfile.settings.lab) return;
+      const lab = userProfile.settings.lab;
+
+      ['minigames', 'chatCommands', 'reactions'].forEach(feature => {
+        const button = document.getElementById(`toggle-${feature}`);
+        if(button) {
+          if(lab[feature]) {
+            button.classList.remove('bg-slate-200');
+            button.classList.add('bg-emerald-500');
+            button.querySelector('div').classList.add('translate-x-6');
+          } else {
+            button.classList.add('bg-slate-200');
+            button.classList.remove('bg-emerald-500');
+            button.querySelector('div').classList.remove('translate-x-6');
+          }
+        }
+      });
+    }
+
+    // --- Minigame Funktionen (DETERMINISTISCH via Firestore) ---
+    let unsubMinigame = null;
+
+    window.openMinigameMenu = () => {
+      document.getElementById('minigame-menu').classList.toggle('hidden');
+    };
+
+    async function requireBothMinigamesEnabled() {
+      const partnerProfile = await fetchUserProfile(activeChatPartner.uid);
+      return !!(userProfile?.settings?.lab?.minigames && partnerProfile?.settings?.lab?.minigames);
+    }
+
+    function minigameSeedFromCall(gameId) {
+      let hash = 0;
+      for (let i = 0; i < gameId.length; i++) hash = ((hash<<5) - hash) + gameId.charCodeAt(i);
+      return Math.abs(hash) >>> 0;
+    }
+    function seededRand(seed) {
+      let x = seed || 123456789;
+      x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
+      return (x >>> 0) / 4294967296;
+    }
+
+    window.startMinigame = async (gameType) => {
+      if(!activeChatId || !activeChatPartner) return;
+
+      try {
+        if(!(await requireBothMinigamesEnabled())) {
+          showToast("Beide müssen Minigames aktiviert haben", "error");
+          return;
+        }
+      } catch(e) {
+        showToast("Fehler beim Prüfen der Einstellungen", "error");
+        return;
+      }
+
+      document.getElementById('minigame-menu').classList.add('hidden');
+
+      const ids = [currentUser.uid, activeChatPartner.uid].sort();
+      const gameData = {
+        type: gameType,
+        chatId: activeChatId,
+        participants: ids,
+        createdBy: currentUser.uid,
+        status: 'waiting',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        players: {
+          [currentUser.uid]: { choice: null, doneAt: null },
+          [activeChatPartner.uid]: { choice: null, doneAt: null }
+        },
+        result: null
+      };
+
+      try {
+        const gameRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'minigames'), gameData);
+        showMinigameModal(gameType, gameRef.id);
+      } catch(e) {
+        console.error("Error creating minigame:", e);
+        showToast("Fehler beim Starten des Spiels", "error");
+      }
+    };
+
+    function showMinigameModal(gameType, gameId) {
+      const modal = document.getElementById('minigame-modal');
+      const content = document.getElementById('minigame-content');
+
+      let html = '';
+
+      switch(gameType) {
+        case 'dice':
+          html = `
+            <div class="text-center">
+              <h3 class="font-semibold text-xl dark:text-white mb-4 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-dice text-blue-500"></i> Würfelspiel
+              </h3>
+              <div id="dice-container" class="flex justify-center mb-6">
+                <div class="dice">
+                  <div class="dice-face front"><div class="dot"></div></div>
+                  <div class="dice-face back"><div class="dot"></div><div class="dot"></div></div>
+                  <div class="dice-face right"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                  <div class="dice-face left"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                  <div class="dice-face top"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                  <div class="dice-face bottom"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+                </div>
+              </div>
+              <p class="text-slate-600 dark:text-slate-200/70 mb-6 font-light" id="dice-status">Warte auf beide Spieler...</p>
+              <button onclick="rollDice('${gameId}')" id="roll-button" class="w-full py-3 bg-blue-500/90 hover:bg-blue-500 text-white rounded-xl font-semibold transition border border-white/10">
+                <i class="fa-solid fa-dice mr-2"></i>Würfeln
+              </button>
+              <div id="dice-results" class="mt-6 hidden">
+                <h4 class="font-semibold dark:text-white mb-2">Ergebnisse:</h4>
+                <div class="grid grid-cols-2 gap-4">
+                  <div class="bg-slate-50 dark:bg-white/5 p-3 rounded-xl border border-slate-200/60 dark:border-white/10">
+                    <p class="text-sm font-semibold dark:text-white">Du</p>
+                    <p id="your-roll" class="text-2xl font-semibold text-blue-500">-</p>
+                  </div>
+                  <div class="bg-slate-50 dark:bg-white/5 p-3 rounded-xl border border-slate-200/60 dark:border-white/10">
+                    <p class="text-sm font-semibold dark:text-white">${activeChatPartner.name}</p>
+                    <p id="their-roll" class="text-2xl font-semibold text-red-500">-</p>
+                  </div>
+                </div>
+                <div id="dice-winner" class="mt-4 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900/40 hidden">
+                  <p class="font-semibold text-emerald-600 dark:text-emerald-200"></p>
+                </div>
+              </div>
+              <button onclick="closeMinigame()" class="mt-4 w-full py-3 bg-slate-200/80 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-slate-200 rounded-xl font-semibold transition">Schliessen</button>
+            </div>
+          `;
+          break;
+
+        case 'rps':
+          html = `
+            <div class="text-center">
+              <h3 class="font-semibold text-xl dark:text-white mb-4 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-hand-fist text-red-500"></i> Schere-Stein-Papier
+              </h3>
+              <p class="text-slate-600 dark:text-slate-200/70 mb-6 font-light" id="rps-status">Wähle deine Option:</p>
+              <div class="grid grid-cols-3 gap-3 mb-6">
+                <button onclick="chooseRPS('${gameId}', 'rock')" class="p-4 bg-slate-100/70 dark:bg-white/5 rounded-xl hover:bg-slate-200/70 dark:hover:bg-white/10 transition border border-slate-200/60 dark:border-white/10">
+                  <i class="fa-solid fa-hand-fist text-2xl text-gray-600 dark:text-gray-200"></i>
+                  <p class="text-sm font-semibold mt-2 dark:text-white">Stein</p>
+                </button>
+                <button onclick="chooseRPS('${gameId}', 'paper')" class="p-4 bg-slate-100/70 dark:bg-white/5 rounded-xl hover:bg-slate-200/70 dark:hover:bg-white/10 transition border border-slate-200/60 dark:border-white/10">
+                  <i class="fa-solid fa-hand text-2xl text-gray-600 dark:text-gray-200"></i>
+                  <p class="text-sm font-semibold mt-2 dark:text-white">Papier</p>
+                </button>
+                <button onclick="chooseRPS('${gameId}', 'scissors')" class="p-4 bg-slate-100/70 dark:bg-white/5 rounded-xl hover:bg-slate-200/70 dark:hover:bg-white/10 transition border border-slate-200/60 dark:border-white/10">
+                  <i class="fa-solid fa-hand-peace text-2xl text-gray-600 dark:text-gray-200"></i>
+                  <p class="text-sm font-semibold mt-2 dark:text-white">Schere</p>
+                </button>
+              </div>
+
+              <div id="rps-choices" class="hidden">
+                <h4 class="font-semibold dark:text-white mb-2">Wahlen:</h4>
+                <div class="grid grid-cols-2 gap-4">
+                  <div class="bg-slate-50 dark:bg-white/5 p-3 rounded-xl border border-slate-200/60 dark:border-white/10">
+                    <p class="text-sm font-semibold dark:text-white">Du</p>
+                    <p id="your-choice" class="text-lg font-semibold text-blue-500">-</p>
+                  </div>
+                  <div class="bg-slate-50 dark:bg-white/5 p-3 rounded-xl border border-slate-200/60 dark:border-white/10">
+                    <p class="text-sm font-semibold dark:text-white">${activeChatPartner.name}</p>
+                    <p id="their-choice" class="text-lg font-semibold text-red-500">-</p>
+                  </div>
+                </div>
+                <div id="rps-winner" class="mt-4 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900/40">
+                  <p class="font-semibold text-emerald-600 dark:text-emerald-200"></p>
+                </div>
+              </div>
+
+              <button onclick="closeMinigame()" class="mt-4 w-full py-3 bg-slate-200/80 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-slate-200 rounded-xl font-semibold transition">Schliessen</button>
+            </div>
+          `;
+          break;
+
+        case 'truth':
+          html = `
+            <div class="text-center">
+              <h3 class="font-semibold text-xl dark:text-white mb-4 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-question text-emerald-600 dark:text-pastel-mint"></i> Wahrheit oder Pflicht
+              </h3>
+              <p class="text-slate-600 dark:text-slate-200/70 mb-6 font-light">Zufällige Herausforderung:</p>
+              <div id="truth-content" class="bg-slate-50 dark:bg-white/5 p-6 rounded-xl mb-6 border border-slate-200/60 dark:border-white/10">
+                <p id="challenge-text" class="text-lg font-semibold dark:text-white">Wähle Wahrheit oder Pflicht</p>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <button onclick="generateTruth('${gameId}')" class="py-3 bg-blue-500/90 hover:bg-blue-500 text-white rounded-xl font-semibold transition border border-white/10">
+                  <i class="fa-solid fa-comment-dots mr-2"></i>Wahrheit
+                </button>
+                <button onclick="generateDare('${gameId}')" class="py-3 bg-red-500/90 hover:bg-red-500 text-white rounded-xl font-semibold transition border border-white/10">
+                  <i class="fa-solid fa-bolt mr-2"></i>Pflicht
+                </button>
+              </div>
+              <div id="challenge-actions" class="mt-6 hidden">
+                <button onclick="completeChallenge('${gameId}')" class="w-full py-3 bg-emerald-600/90 hover:bg-emerald-600 text-white rounded-xl font-semibold transition mb-2 border border-white/10">
+                  <i class="fa-solid fa-check mr-2"></i>Herausforderung angenommen
+                </button>
+                <button onclick="skipChallenge('${gameId}')" class="w-full py-3 bg-slate-200/80 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-slate-200 rounded-xl font-semibold transition">
+                  <i class="fa-solid fa-forward mr-2"></i>Überspringen
+                </button>
+              </div>
+              <button onclick="closeMinigame()" class="mt-4 w-full py-3 bg-slate-200/80 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-slate-200 rounded-xl font-semibold transition">Schliessen</button>
+            </div>
+          `;
+          break;
+
+        case 'coin':
+          html = `
+            <div class="text-center">
+              <h3 class="font-semibold text-xl dark:text-white mb-4 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-coins text-yellow-500"></i> Münzwurf
+              </h3>
+              <div id="coin-container" class="mb-6">
+                <div class="text-6xl mb-4" id="coin-display">🪙</div>
+                <p class="text-slate-600 dark:text-slate-200/70 font-light" id="coin-status">Wähle Kopf oder Zahl</p>
+              </div>
+              <div class="grid grid-cols-2 gap-3 mb-6">
+                <button onclick="chooseCoin('${gameId}', 'heads')" class="py-3 bg-blue-500/90 hover:bg-blue-500 text-white rounded-xl font-semibold transition border border-white/10">
+                  <i class="fa-solid fa-crown mr-2"></i>Kopf
+                </button>
+                <button onclick="chooseCoin('${gameId}', 'tails')" class="py-3 bg-red-500/90 hover:bg-red-500 text-white rounded-xl font-semibold transition border border-white/10">
+                  <i class="fa-solid fa-feather mr-2"></i>Zahl
+                </button>
+              </div>
+              <div id="coin-results" class="hidden">
+                <h4 class="font-semibold dark:text-white mb-2">Ergebnis:</h4>
+                <div class="bg-slate-50 dark:bg-white/5 p-4 rounded-xl border border-slate-200/60 dark:border-white/10">
+                  <p id="coin-result-text" class="text-lg font-semibold dark:text-white"></p>
+                  <p id="coin-winner" class="mt-2 text-emerald-600 dark:text-emerald-200 font-semibold"></p>
+                </div>
+              </div>
+              <button onclick="flipCoin('${gameId}')" id="flip-button" class="w-full py-3 bg-yellow-500/90 hover:bg-yellow-500 text-white rounded-xl font-semibold transition mt-4 border border-white/10">
+                <i class="fa-solid fa-repeat mr-2"></i>Münze werfen
+              </button>
+              <button onclick="closeMinigame()" class="mt-4 w-full py-3 bg-slate-200/80 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-slate-200 rounded-xl font-semibold transition">Schliessen</button>
+            </div>
+          `;
+          break;
+
+        case 'number':
+          html = `
+            <div class="text-center">
+              <h3 class="font-semibold text-xl dark:text-white mb-4 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-hashtag text-purple-500"></i> Zahlen raten
+              </h3>
+              <p class="text-slate-600 dark:text-slate-200/70 mb-4 font-light">Ich denke an eine Zahl zwischen 1 und 10</p>
+              <div class="grid grid-cols-5 gap-2 mb-6">
+                ${Array.from({length: 10}, (_, i) => i + 1).map(num => `
+                  <button onclick="guessNumber('${gameId}', ${num})" class="p-3 bg-slate-100/70 dark:bg-white/5 rounded-lg hover:bg-slate-200/70 dark:hover:bg-white/10 transition font-semibold dark:text-white border border-slate-200/60 dark:border-white/10">${num}</button>
+                `).join('')}
+              </div>
+              <div id="number-results" class="hidden">
+                <h4 class="font-semibold dark:text-white mb-2">Ergebnisse:</h4>
+                <div class="grid grid-cols-2 gap-4">
+                  <div class="bg-slate-50 dark:bg-white/5 p-3 rounded-xl border border-slate-200/60 dark:border-white/10">
+                    <p class="text-sm font-semibold dark:text-white">Du</p>
+                    <p id="your-guess" class="text-2xl font-semibold text-blue-500">-</p>
+                  </div>
+                  <div class="bg-slate-50 dark:bg-white/5 p-3 rounded-xl border border-slate-200/60 dark:border-white/10">
+                    <p class="text-sm font-semibold dark:text-white">${activeChatPartner.name}</p>
+                    <p id="their-guess" class="text-2xl font-semibold text-red-500">-</p>
+                  </div>
+                </div>
+                <div id="number-target" class="mt-4 p-3 rounded-xl bg-purple-50 dark:bg-purple-900/15 border border-purple-100 dark:border-purple-900/40">
+                  <p class="text-sm text-slate-600 dark:text-slate-200/70 font-light">Zielzahl war:</p>
+                  <p id="target-number" class="text-3xl font-semibold text-purple-600 dark:text-purple-200">?</p>
+                </div>
+                <div id="number-winner" class="mt-4 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900/40">
+                  <p class="font-semibold text-emerald-600 dark:text-emerald-200"></p>
+                </div>
+              </div>
+              <button onclick="closeMinigame()" class="mt-4 w-full py-3 bg-slate-200/80 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-slate-200 rounded-xl font-semibold transition">Schliessen</button>
+            </div>
+          `;
+          break;
+      }
+
+      content.innerHTML = html;
+      modal.classList.remove('hidden');
+
+      listenToMinigame(gameId);
+    }
+
+    window.closeMinigame = () => {
+      document.getElementById('minigame-modal').classList.add('hidden');
+      if(unsubMinigame) { unsubMinigame(); unsubMinigame = null; }
+    };
+
+    function listenToMinigame(gameId) {
+      if(unsubMinigame) { unsubMinigame(); unsubMinigame = null; }
+      const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'minigames', gameId);
+      unsubMinigame = onSnapshot(gameRef, (snap) => {
+        if(!snap.exists()) return;
+        updateMinigameUI(gameId, snap.data());
+      });
+    }
+
+    function updateMinigameUI(gameId, game) {
+      const modal = document.getElementById('minigame-modal');
+      if(modal.classList.contains('hidden')) return;
+
+      const myChoice = game.players?.[currentUser.uid]?.choice;
+      const theirChoice = game.players?.[activeChatPartner.uid]?.choice;
+
+      if(game.status !== 'done' && myChoice != null && theirChoice != null) {
+        finalizeMinigameIfNeeded(gameId, game).catch(console.error);
+      }
+
+      switch(game.type) {
+        case 'dice': {
+          const diceStatus = document.getElementById('dice-status');
+          const rollButton = document.getElementById('roll-button');
+          const diceResults = document.getElementById('dice-results');
+          const yourRoll = document.getElementById('your-roll');
+          const theirRoll = document.getElementById('their-roll');
+          const diceWinner = document.getElementById('dice-winner');
+
+          if(myChoice != null && theirChoice != null) {
+            diceStatus.textContent = "Beide haben gewürfelt!";
+            diceResults.classList.remove('hidden');
+            yourRoll.textContent = String(myChoice);
+            theirRoll.textContent = String(theirChoice);
+
+            const res = game.result;
+            if(res && diceWinner) {
+              diceWinner.querySelector('p').textContent = res.summary || '';
+              diceWinner.classList.remove('hidden');
+            }
+
+            rollButton.disabled = true;
+            rollButton.classList.add('opacity-50', 'cursor-not-allowed');
+          } else if(myChoice != null) {
+            diceStatus.textContent = "Du hast gewürfelt. Warte auf " + activeChatPartner.name + "...";
+            rollButton.disabled = true;
+            rollButton.classList.add('opacity-50', 'cursor-not-allowed');
+          } else {
+            diceStatus.textContent = "Würfle jetzt!";
+            rollButton.disabled = false;
+            rollButton.classList.remove('opacity-50', 'cursor-not-allowed');
+          }
+          break;
+        }
+
+        case 'rps': {
+          const rpsStatus = document.getElementById('rps-status');
+          const rpsChoices = document.getElementById('rps-choices');
+          const yourChoiceEl = document.getElementById('your-choice');
+          const theirChoiceEl = document.getElementById('their-choice');
+          const rpsWinner = document.getElementById('rps-winner');
+
+          const choiceMap = { rock: "✊ Stein", paper: "✋ Papier", scissors: "✌️ Schere" };
+
+          if(myChoice && theirChoice) {
+            rpsStatus.textContent = "Beide haben gewählt!";
+            rpsChoices.classList.remove('hidden');
+            yourChoiceEl.textContent = choiceMap[myChoice] || myChoice;
+            theirChoiceEl.textContent = choiceMap[theirChoice] || theirChoice;
+
+            const res = game.result;
+            if(res && rpsWinner) rpsWinner.querySelector('p').textContent = res.summary || '';
+          } else if(myChoice) {
+            rpsStatus.textContent = "Du hast gewählt. Warte auf " + activeChatPartner.name + "...";
+          } else {
+            rpsStatus.textContent = "Wähle deine Option:";
+          }
+          break;
+        }
+
+        case 'truth': {
+          const me = game.players?.[currentUser.uid] || {};
+          const text = me.question || me.challenge || '';
+          if(text) {
+            document.getElementById('challenge-text').textContent = me.choice === 'truth' ? `"${text}"` : text;
+            document.getElementById('challenge-actions').classList.remove('hidden');
+          }
+          break;
+        }
+
+        case 'coin': {
+          const coinStatus = document.getElementById('coin-status');
+          const coinResults = document.getElementById('coin-results');
+          const coinResultText = document.getElementById('coin-result-text');
+          const coinWinner = document.getElementById('coin-winner');
+          const flipButton = document.getElementById('flip-button');
+          const coinDisplay = document.getElementById('coin-display');
+
+          if(myChoice && theirChoice) {
+            coinStatus.textContent = "Beide haben gewählt!";
+            coinResults.classList.remove('hidden');
+
+            const res = game.result;
+            if(res) {
+              coinDisplay.textContent = res.result === 'heads' ? '👑' : '🪶';
+              coinResultText.textContent = res.result === 'heads' ? "🪙 Kopf!" : "🪙 Zahl!";
+              coinWinner.textContent = res.summary || '';
+            }
+
+            flipButton.disabled = true;
+            flipButton.classList.add('opacity-50', 'cursor-not-allowed');
+          } else if(myChoice) {
+            coinStatus.textContent = "Du hast gewählt. Warte auf " + activeChatPartner.name + "...";
+            flipButton.disabled = true;
+            flipButton.classList.add('opacity-50', 'cursor-not-allowed');
+          } else {
+            coinStatus.textContent = "Wähle Kopf oder Zahl";
+            flipButton.disabled = false;
+            flipButton.classList.remove('opacity-50', 'cursor-not-allowed');
+          }
+          break;
+        }
+
+        case 'number': {
+          const numberResults = document.getElementById('number-results');
+          const yourGuess = document.getElementById('your-guess');
+          const theirGuess = document.getElementById('their-guess');
+          const targetNumber = document.getElementById('target-number');
+          const numberWinner = document.getElementById('number-winner');
+
+          if(myChoice != null && theirChoice != null) {
+            numberResults.classList.remove('hidden');
+            yourGuess.textContent = String(myChoice);
+            theirGuess.textContent = String(theirChoice);
+
+            const res = game.result;
+            if(res) {
+              targetNumber.textContent = String(res.target);
+              numberWinner.querySelector('p').textContent = res.summary || '';
+            }
+          }
+          break;
+        }
+      }
+    }
+
+    async function finalizeMinigameIfNeeded(gameId, game) {
+      if(game.createdBy !== currentUser.uid) return;
+      if(game.status === 'done') return;
+      const myChoice = game.players?.[currentUser.uid]?.choice;
+      const theirUid = activeChatPartner.uid;
+      const theirChoice = game.players?.[theirUid]?.choice;
+      if(myChoice == null || theirChoice == null) return;
+
+      const seed = minigameSeedFromCall(gameId);
+      const r = seededRand(seed);
+      let result = null;
+
+      if(game.type === 'dice') {
+        const a = parseInt(myChoice, 10), b = parseInt(theirChoice, 10);
+        let summary = '';
+        if(a > b) summary = `🎉 Du gewinnst mit ${a} gegen ${b}!`;
+        else if(b > a) summary = `😢 ${activeChatPartner.name} gewinnt mit ${b} gegen ${a}!`;
+        else summary = `🤝 Unentschieden! Beide haben ${a}`;
+        result = { a, b, summary };
+
+      } else if(game.type === 'rps') {
+        const choiceMap = { rock: "✊ Stein", paper: "✋ Papier", scissors: "✌️ Schere" };
+        const win = calculateRPSWinner(myChoice, theirChoice);
+        let summary = '';
+        if(win === 'win') summary = `🎉 Du gewinnst! ${choiceMap[myChoice]} schlägt ${choiceMap[theirChoice]}`;
+        else if(win === 'lose') summary = `😢 ${activeChatPartner.name} gewinnt! ${choiceMap[theirChoice]} schlägt ${choiceMap[myChoice]}`;
+        else summary = `🤝 Unentschieden! Beide haben ${choiceMap[myChoice]}`;
+        result = { summary };
+
+      } else if(game.type === 'coin') {
+        const coin = (r > 0.5) ? 'heads' : 'tails';
+        let summary = '';
+        const meWins = myChoice === coin;
+        const theyWins = theirChoice === coin;
+        if(meWins && theyWins) summary = "🤝 Beide haben gewonnen!";
+        else if(meWins) summary = "🎉 Du gewinnst!";
+        else if(theyWins) summary = `😢 ${activeChatPartner.name} gewinnt!`;
+        else summary = "😞 Niemand hat gewonnen!";
+        result = { result: coin, summary };
+
+      } else if(game.type === 'number') {
+        const target = Math.floor(r * 10) + 1;
+        const a = parseInt(myChoice, 10), b = parseInt(theirChoice, 10);
+        const da = Math.abs(a - target);
+        const db = Math.abs(b - target);
+        let summary = '';
+        if(da < db) summary = `🎉 Du gewinnst! (Abweichung: ${da} vs ${db})`;
+        else if(db < da) summary = `😢 ${activeChatPartner.name} gewinnt! (Abweichung: ${db} vs ${da})`;
+        else summary = `🤝 Unentschieden! Beide Abweichung: ${da}`;
+        result = { target, summary };
+      } else {
+        return;
+      }
+
+      const ref = doc(db, 'artifacts', appId, 'public', 'data', 'minigames', gameId);
+      await updateDoc(ref, {
+        status: 'done',
+        result,
+        updatedAt: serverTimestamp()
+      });
+    }
+
+    // Minigame Actions
+    window.rollDice = async (gameId) => {
+      const dice = document.querySelector('.dice');
+      if(dice) dice.classList.add('rolling');
+
+      const roll = Math.floor(Math.random() * 6) + 1;
+      try {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'minigames', gameId), {
+          [`players.${currentUser.uid}.choice`]: roll,
+          [`players.${currentUser.uid}.doneAt`]: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        setTimeout(() => { if(dice) dice.classList.remove('rolling'); }, 900);
+      } catch(e) {
+        console.error("Error rolling dice:", e);
+        showToast("Fehler beim Würfeln", "error");
+      }
+    };
+
+    window.chooseRPS = async (gameId, choice) => {
+      try {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'minigames', gameId), {
+          [`players.${currentUser.uid}.choice`]: choice,
+          [`players.${currentUser.uid}.doneAt`]: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      } catch(e) {
+        console.error("Error choosing RPS:", e);
+        showToast("Fehler bei der Auswahl", "error");
+      }
+    };
+
+    window.generateTruth = async (gameId) => {
+      const randomQuestion = truthQuestions[Math.floor(Math.random() * truthQuestions.length)];
+      document.getElementById('challenge-text').textContent = `"${randomQuestion}"`;
+      document.getElementById('challenge-actions').classList.remove('hidden');
+
+      try {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'minigames', gameId), {
+          [`players.${currentUser.uid}.choice`]: 'truth',
+          [`players.${currentUser.uid}.question`]: randomQuestion,
+          [`players.${currentUser.uid}.doneAt`]: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      } catch(e) {
+        console.error("Error generating truth:", e);
+      }
+    };
+
+    window.generateDare = async (gameId) => {
+      const randomDare = dareChallenges[Math.floor(Math.random() * dareChallenges.length)];
+      document.getElementById('challenge-text').textContent = randomDare;
+      document.getElementById('challenge-actions').classList.remove('hidden');
+
+      try {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'minigames', gameId), {
+          [`players.${currentUser.uid}.choice`]: 'dare',
+          [`players.${currentUser.uid}.challenge`]: randomDare,
+          [`players.${currentUser.uid}.doneAt`]: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      } catch(e) {
+        console.error("Error generating dare:", e);
+      }
+    };
+
+    window.completeChallenge = async (gameId) => {
+      showToast("Herausforderung abgeschlossen! 👍", "success");
+      closeMinigame();
+      try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'minigames', gameId)); } catch(e) { console.error(e); }
+    };
+
+    window.skipChallenge = async (gameId) => {
+      showToast("Herausforderung übersprungen", "info");
+      closeMinigame();
+      try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'minigames', gameId)); } catch(e) { console.error(e); }
+    };
+
+    window.chooseCoin = async (gameId, choice) => {
+      try {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'minigames', gameId), {
+          [`players.${currentUser.uid}.choice`]: choice,
+          [`players.${currentUser.uid}.doneAt`]: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      } catch(e) {
+        console.error("Error choosing coin:", e);
+        showToast("Fehler bei der Auswahl", "error");
+      }
+    };
+
+    window.flipCoin = async (gameId) => {
+      const coinDisplay = document.getElementById('coin-display');
+      if(coinDisplay) coinDisplay.textContent = "🔄";
+      setTimeout(() => { if(coinDisplay) coinDisplay.textContent = "🪙"; }, 450);
+    };
+
+    window.guessNumber = async (gameId, number) => {
+      try {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'minigames', gameId), {
+          [`players.${currentUser.uid}.choice`]: number,
+          [`players.${currentUser.uid}.doneAt`]: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      } catch(e) {
+        console.error("Error guessing number:", e);
+        showToast("Fehler beim Raten", "error");
+      }
+    };
+
+    function calculateRPSWinner(player1, player2) {
+      if(player1 === player2) return 'draw';
+      if(
+        (player1 === 'rock' && player2 === 'scissors') ||
+        (player1 === 'paper' && player2 === 'rock') ||
+        (player1 === 'scissors' && player2 === 'paper')
+      ) return 'win';
+      return 'lose';
+    }
+
+    function updateMinigameButtonVisibility() {
+      const minigameButton = document.getElementById('minigame-button');
+      if(!minigameButton) return;
+      if(!activeChatPartner || !userProfile?.settings?.lab) { minigameButton.classList.add('hidden'); return; }
+      if(userProfile.settings.lab.minigames) minigameButton.classList.remove('hidden');
+      else minigameButton.classList.add('hidden');
+    }
+
+    // --- Presence System ---
+    function startPresence() {
+      if(presenceInterval) clearInterval(presenceInterval);
+
+      updateDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid), {
+        online: true,
+        lastSeen: serverTimestamp()
+      }).catch(()=>{});
+
+      const update = () => {
+        if(!currentUser) return;
+        updateDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid), { lastSeen: serverTimestamp() }).catch(()=>{});
+      };
+      update();
+      presenceInterval = setInterval(update, 30000);
+    }
+
+    function startApp() {
+      initStep('UI initialisieren ...');
+      document.getElementById('loading-screen').classList.add('hidden');
+      document.getElementById('loading-actions').classList.add('hidden');
+      document.getElementById('main-header').classList.remove('hidden');
+      document.getElementById('main-content').classList.remove('hidden');
+      document.getElementById('display-friend-code').innerText = userProfile.friendCode;
+      updateLabUI();
+      setupListeners();
+      showView('dashboard');
+      hideFakeScreen(); // not shown by default
+    }
+
+    function setupListeners() {
+      cleanup();
+      initStep('Listener starten ...');
+
+      unsubProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', currentUser.uid), (s) => {
+        if(s.exists()) {
+          userProfile = s.data();
+          updateUIFromProfile();
+          updateLabUI();
+        }
+      });
+
+      const qi = query(
+        collection(db, 'artifacts', appId, 'public', 'data', 'friendRequests'),
+        where('to','==',currentUser.uid),
+        where('status','==','pending')
+      );
+
+      unsubIncoming = onSnapshot(qi, (s) => {
+        const l = document.getElementById('list-incoming');
+        l.innerHTML='';
+        let c=0;
+        s.forEach(async d => {
+          const r = d.data();
+          if(isBlocked(r.from)) return;
+          c++;
+          const p = await fetchUserProfile(r.from);
+          l.innerHTML += `
+            <div class="bg-white/80 dark:bg-white/5 p-3 rounded-xl border border-slate-200/70 dark:border-white/10 flex justify-between items-center">
+              <div class="flex items-center gap-3">
+                <img src="${p.avatar||`https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}`}" class="w-10 h-10 rounded-full object-cover">
+                <div>
+                  <p class="font-semibold text-sm dark:text-white">${escapeHtml(p.name)}</p>
+                  <p class="text-xs text-slate-400 font-light">${p.friendCode || ''}</p>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <button onclick="declineRequest('${d.id}')" class="w-8 h-8 rounded-full bg-slate-100/70 dark:bg-white/5 text-red-500 border border-slate-200/50 dark:border-white/10"><i class="fa-solid fa-xmark"></i></button>
+                <button onclick="acceptRequest('${d.id}','${r.from}')" class="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-200 border border-emerald-200/50 dark:border-emerald-900/30"><i class="fa-solid fa-check"></i></button>
+              </div>
+            </div>`;
+        });
+        document.getElementById('section-incoming').classList.toggle('hidden', c===0);
+      });
+
+      const qo = query(
+        collection(db, 'artifacts', appId, 'public', 'data', 'friendRequests'),
+        where('from','==',currentUser.uid),
+        where('status','==','pending')
+      );
+
+      unsubOutgoing = onSnapshot(qo, (s) => {
+        const l = document.getElementById('list-outgoing');
+        l.innerHTML='';
+        let c=0;
+        s.forEach(async d => {
+          c++;
+          const r = d.data();
+          const p = await fetchUserProfile(r.to);
+          l.innerHTML += `
+            <div class="bg-white/80 dark:bg-white/5 p-3 rounded-xl border border-slate-200/70 dark:border-white/10 flex justify-between items-center opacity-80">
+              <span class="text-sm dark:text-slate-200/80 font-light">An: ${escapeHtml(p.name)} (${p.friendCode || ''})</span>
+              <button onclick="withdrawRequest('${d.id}')" class="text-xs text-red-500/80 font-semibold">Zurück</button>
+            </div>`;
+        });
+        document.getElementById('section-outgoing').classList.toggle('hidden', c===0);
+      });
+
+      const qf = query(
+        collection(db, 'artifacts', appId, 'public', 'data', 'friendships'),
+        where('participants','array-contains',currentUser.uid)
+      );
+
+      unsubFriends = onSnapshot(qf, async (s) => {
+        const l = document.getElementById('list-friends');
+        l.innerHTML='';
+
+        if(s.empty) {
+          l.innerHTML='<div class="text-center text-slate-400 py-8 text-sm">Noch keine Freunde.<br>Tausche Codes aus!</div>';
+          return;
+        }
+
+        const friends = [];
+        s.forEach(d => {
+          const data = d.data();
+          const fid = data.participants.find(id=>id!==currentUser.uid);
+          if(isBlocked(fid)) return;
+          friends.push(fid);
+        });
+
+        const friendObjs = [];
+        for(const fid of friends) {
+          const p = await fetchUserProfile(fid);
+          friendManageCache[fid] = p;
+
+          const displayName = getFriendDisplayName(fid, p);
+          const now = Date.now();
+          const lastSeen = p.lastSeen ? p.lastSeen.toMillis() : 0;
+          const isOnline = p.online === true || (lastSeen && (now - lastSeen < 120000));
+          const pinned = isPinnedFriend(fid);
+
+          const ids = [currentUser.uid, fid].sort();
+          const chatId = `${ids[0]}_${ids[1]}`;
+          const meta = await fetchChatMetaCached(chatId);
+          const unread = isChatUnread(chatId, meta);
+
+          friendObjs.push({ fid, p, displayName, isOnline, pinned, unread, chatId });
+        }
+
+        friendObjs.sort((a,b) =>
+          (b.pinned - a.pinned) ||
+          (b.isOnline - a.isOnline) ||
+          a.displayName.localeCompare(b.displayName)
+        );
+
+        for(const f of friendObjs) {
+          const { fid, p, displayName, isOnline, pinned, unread, chatId } = f;
+
+          if(pinned === false && (chatMetaCache[chatId]?.archivedBy || []).includes(currentUser.uid)) {
+            continue;
+          }
+
+          const el = document.createElement('div');
+          el.className = 'bg-white/80 dark:bg-white/5 p-3 rounded-xl border border-slate-200/70 dark:border-white/10 flex justify-between items-center cursor-pointer hover:border-emerald-200 transition';
+          el.dataset.name = (displayName || '').toLowerCase();
+          el.dataset.online = isOnline ? '1' : '0';
+
+          el.onclick = (e) => {
+            if(!e.target.closest('button')) openChat(fid, p);
+          };
+
+          const avatar = p.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=10b981&color=fff`;
+
+          el.innerHTML = `
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="relative">
+                <img src="${avatar}" class="w-12 h-12 rounded-full object-cover bg-slate-200">
+                <div class="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-ink-900 ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}"></div>
+              </div>
+              <div class="min-w-0">
+                <p class="font-semibold text-slate-800 dark:text-white truncate flex items-center gap-2">
+                  ${pinned ? '<i class="fa-solid fa-thumbtack text-emerald-500 text-xs"></i>' : ''}
+                  <span class="truncate">${escapeHtml(displayName)}</span>
+                  ${unread ? '<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100/80 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200 border border-emerald-200/50 dark:border-emerald-900/30">Neu</span>' : ''}
+                </p>
+                <p class="text-xs ${isOnline ? 'text-green-600 dark:text-green-400' : 'text-slate-400'} font-light">${isOnline ? 'Online' : 'Offline'}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-1">
+              <button onclick="openFriendManage('${fid}');" class="w-10 h-10 rounded-full text-slate-400 dark:text-slate-200/60 hover:text-slate-700 dark:hover:text-white transition">
+                <i class="fa-solid fa-ellipsis"></i>
+              </button>
+            </div>
+          `;
+          l.appendChild(el);
+        }
+
+        const placeholder = document.createElement('div');
+        placeholder.dataset.placeholder = '1';
+        placeholder.className = 'hidden text-center text-slate-400 py-3 text-xs font-light';
+        placeholder.textContent = 'Keine Treffer mit diesem Filter.';
+        l.appendChild(placeholder);
+
+        applyFriendFilter();
+      });
+
+      // Video Calls
+      const qc = query(
+        collection(db, 'artifacts', appId, 'public', 'data', 'calls'),
+        where('to','==',currentUser.uid)
+      );
+
+      unsubCall = onSnapshot(qc, s => {
+        s.docChanges().forEach(async c => {
+          if(c.type === 'added') {
+            const d = c.doc.data();
+
+            if(Date.now() - d.timestamp?.toMillis() > 60000) {
+              deleteDoc(c.doc.ref);
+              return;
+            }
+
+            if(d.type === 'offer') {
+              const caller = await fetchUserProfile(d.from);
+              incomingCallData = {
+                callId: c.doc.id,
+                callerId: d.from,
+                callerName: caller.name,
+                chatId: d.chatId || null,
+                offer: d.offer
+              };
+
+              document.getElementById('caller-name').textContent = `Von ${caller.name}`;
+              document.getElementById('incoming-call-modal').classList.remove('hidden');
+
+              setTimeout(() => {
+                if(document.getElementById('incoming-call-modal').classList.contains('hidden') === false) {
+                  declineIncomingCall();
+                }
+              }, 30000);
+            }
+          } else if(c.type === 'modified') {
+            const d = c.doc.data();
+            if(d?.ended && currentCallId === c.doc.id) {
+              showToast("Anruf beendet", "info");
+              endVideoCall('remote-ended');
+            }
+          } else if(c.type === 'removed') {
+            const d = c.doc.data ? c.doc.data() : {};
+
+            if(incomingCallData && incomingCallData.callId === c.doc.id) {
+              document.getElementById('incoming-call-modal').classList.add('hidden');
+              try {
+                const chatId = incomingCallData.chatId || d.chatId || makeChatId(incomingCallData.callerId, currentUser.uid);
+                await logCallMessage(chatId, {
+                  callState: 'missed',
+                  direction: 'incoming',
+                  otherUid: incomingCallData.callerId,
+                  otherName: incomingCallData.callerName
+                });
+              } catch(e) { console.error(e); }
+              incomingCallData = null;
+            }
+
+            if(currentCallId && currentCallId === c.doc.id) {
+              endVideoCall('remote-ended');
+            }
+          }
+        });
+      });
+    }
+
+    // Incoming call accept/decline
+    window.acceptIncomingCall = async () => {
+      if(!incomingCallData) return;
+
+      const callChatId = incomingCallData.chatId || null;
+
+      document.getElementById('incoming-call-modal').classList.add('hidden');
+      currentCallId = incomingCallData.callId;
+      callWasAnswered = true;
+      activeChatPartner = await fetchUserProfile(incomingCallData.callerId);
+      if(callChatId) activeChatId = callChatId;
+
+      document.getElementById('video-overlay').classList.remove('hidden');
+      document.getElementById('call-status').innerText = "Verbinde...";
+
+      await initLocalStream();
+      createPeerConnection();
+
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingCallData.offer));
+
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'calls', currentCallId), {
+        answer: {type: answer.type, sdp: answer.sdp},
+        answeredAt: serverTimestamp()
+      });
+
+      watchActiveCall(currentCallId);
+      incomingCallData = null;
+    };
+
+    window.declineIncomingCall = async () => {
+      if(!incomingCallData) return;
+
+      try {
+        const chatId = incomingCallData.chatId || makeChatId(incomingCallData.callerId, currentUser.uid);
+        await logCallMessage(chatId, {
+          callState: 'missed',
+          direction: 'incoming',
+          otherUid: incomingCallData.callerId,
+          otherName: incomingCallData.callerName
+        });
+      } catch(e) { console.error(e); }
+
+      try {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'calls', incomingCallData.callId));
+      } catch(e) { console.error(e); }
+
+      document.getElementById('incoming-call-modal').classList.add('hidden');
+      incomingCallData = null;
+    };
+
+    function cleanup() {
+      if(unsubProfile) unsubProfile();
+      if(unsubIncoming) unsubIncoming();
+      if(unsubOutgoing) unsubOutgoing();
+      if(unsubFriends) unsubFriends();
+      if(unsubChat) unsubChat();
+      if(unsubCall) unsubCall();
+      if(unsubChatMeta) unsubChatMeta();
+      if(unsubPartnerProfile) unsubPartnerProfile();
+      if(presenceInterval) clearInterval(presenceInterval);
+
+      if(currentUser) {
+        updateDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid), {
+          online: false,
+          lastSeen: serverTimestamp()
+        }).catch(()=>{});
+      }
+    }
+
+    function updateUIFromProfile() {
+      const av = userProfile.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userProfile.name)}&background=10b981&color=fff`;
+      document.getElementById('header-avatar').src=av;
+      document.getElementById('header-avatar').classList.remove('hidden');
+      document.getElementById('settings-avatar').src=av;
+      document.getElementById('settings-name-display').textContent = userProfile.name;
+      document.getElementById('settings-email').textContent = userProfile.email;
+    }
+
+    window.uploadAvatar = async (inp) => {
+      if(!inp.files[0]) return;
+      try {
+        const b64 = await resizeImage(inp.files[0], 300);
+        await updateDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid), { avatar: b64 });
+        showToast("Profilbild aktualisiert", "success");
+      } catch(e){ showToast("Fehler beim Hochladen", "error"); }
+    };
+
+    // --- Friend Management ---
+    let filterOnlineOnly = false;
+    let activeManagedFriendUid = null;
+    const friendManageCache = {};
+    const chatMetaCache = {};
+
+    window.toggleOnlineFilter = () => {
+      filterOnlineOnly = !filterOnlineOnly;
+      const btn = document.getElementById('btn-filter-online');
+      if(btn) {
+        if(filterOnlineOnly) {
+          btn.classList.remove('bg-white/80', 'dark:bg-ink-900/40', 'text-slate-600', 'dark:text-slate-200/80');
+          btn.classList.add('bg-emerald-600/90', 'text-white', 'border-emerald-500');
+        } else {
+          btn.classList.add('bg-white/80', 'dark:bg-ink-900/40', 'text-slate-600', 'dark:text-slate-200/80');
+          btn.classList.remove('bg-emerald-600/90', 'text-white', 'border-emerald-500');
+        }
+      }
+      applyFriendFilter();
+    };
+
+    window.applyFriendFilter = () => {
+      const input = document.getElementById('friend-search');
+      const term = (input?.value || '').trim().toLowerCase();
+      const list = document.getElementById('list-friends');
+      if(!list) return;
+
+      const items = Array.from(list.children);
+      let visible = 0;
+      let placeholder = null;
+
+      for(const el of items) {
+        const isPlaceholder = el.dataset && el.dataset.placeholder === '1';
+        if(isPlaceholder) { placeholder = el; continue; }
+
+        const name = (el.dataset.name || '').toLowerCase();
+        const isOnline = (el.dataset.online || '0') === '1';
+
+        const match = !term || name.includes(term);
+        const onlineOk = !filterOnlineOnly || isOnline;
+
+        const show = match && onlineOk;
+        el.classList.toggle('hidden', !show);
+        if(show) visible++;
+      }
+
+      if(placeholder) placeholder.classList.toggle('hidden', visible !== 0);
+    };
+
+    function escapeHtml(str='') {
+      return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+    }
+
+    function getFriendAlias(uid) { return userProfile?.settings?.aliases?.[uid] || ''; }
+    function getFriendDisplayName(uid, profile) { return getFriendAlias(uid) || profile?.name || 'Unbekannt'; }
+    function isPinnedFriend(uid) { return userProfile?.settings?.pinnedFriends?.includes(uid) === true; }
+
+    async function fetchChatMetaCached(chatId) {
+      if(chatMetaCache[chatId]) return chatMetaCache[chatId];
+      try {
+        const s = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chats', chatId));
+        chatMetaCache[chatId] = s.exists() ? s.data() : {};
+        return chatMetaCache[chatId];
+      } catch(e) { return {}; }
+    }
+
+    function isChatUnread(chatId, meta) {
+      const lastOpened = parseInt(localStorage.getItem('lastOpened_'+chatId) || '0', 10);
+      const updatedAt = meta?.updatedAt ? meta.updatedAt.toMillis() : 0;
+      const lastSender = meta?.lastSender;
+      return updatedAt > lastOpened && lastSender && lastSender !== currentUser.uid;
+    }
+
+    window.openFriendManage = async (uid) => {
+      if(!uid) return;
+      activeManagedFriendUid = uid;
+
+      let p = friendManageCache[uid];
+      if(!p) { p = await fetchUserProfile(uid); friendManageCache[uid] = p; }
+
+      const displayName = getFriendDisplayName(uid, p);
+      const avatar = p.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=10b981&color=fff`;
+
+      document.getElementById('manage-friend-avatar').src = avatar;
+      document.getElementById('manage-friend-name').textContent = displayName;
+      document.getElementById('manage-friend-meta').textContent = p.friendCode ? `Code: ${p.friendCode}` : `UID: ${uid.slice(0,6)}…`;
+
+      const aliasInput = document.getElementById('manage-friend-alias');
+      aliasInput.value = getFriendAlias(uid);
+
+      const pinBtn = document.getElementById('btn-pin-friend');
+      const muteBtn = document.getElementById('btn-mute-friend');
+      const blockBtn = document.getElementById('btn-block-friend');
+
+      const pinned = isPinnedFriend(uid);
+      const muted = isUserMuted(uid);
+      const blocked = isBlocked(uid);
+
+      if(pinBtn) pinBtn.querySelector('span').textContent = pinned ? 'Unpin' : 'Pin';
+      if(muteBtn) muteBtn.querySelector('span').textContent = muted ? 'Nicht stumm' : 'Stumm';
+      if(blockBtn) blockBtn.querySelector('span').textContent = blocked ? 'Entblockieren' : 'Blockieren';
+
+      document.getElementById('friend-manage-modal').classList.remove('hidden');
+    };
+
+    window.closeFriendManage = () => {
+      document.getElementById('friend-manage-modal').classList.add('hidden');
+      activeManagedFriendUid = null;
+    };
+
+    window.saveFriendAlias = async () => {
+      const uid = activeManagedFriendUid;
+      if(!uid) return;
+      const alias = (document.getElementById('manage-friend-alias').value || '').trim();
+
+      try {
+        const ref = doc(db, 'artifacts', appId, 'users', currentUser.uid);
+        if(alias) {
+          await updateDoc(ref, { [`settings.aliases.${uid}`]: alias });
+          showToast("Alias gespeichert", "success");
+        } else {
+          await updateDoc(ref, { [`settings.aliases.${uid}`]: deleteField() });
+          showToast("Alias entfernt", "info");
+        }
+        applyFriendFilter();
+      } catch(e) {
+        console.error(e);
+        showToast("Alias konnte nicht gespeichert werden", "error");
+      }
+    };
+
+    window.togglePinFriend = async () => {
+      const uid = activeManagedFriendUid;
+      if(!uid) return;
+
+      try {
+        const ref = doc(db, 'artifacts', appId, 'users', currentUser.uid);
+        const pinned = isPinnedFriend(uid);
+        await updateDoc(ref, { [`settings.pinnedFriends`]: pinned ? arrayRemove(uid) : arrayUnion(uid) });
+        showToast(pinned ? "Unpin entfernt" : "Freund gepinnt", "success");
+      } catch(e) {
+        console.error(e);
+        showToast("Pin konnte nicht geändert werden", "error");
+      }
+    };
+
+    window.toggleMuteManagedFriend = async () => {
+      const uid = activeManagedFriendUid;
+      if(!uid) return;
+      try {
+        const ref = doc(db, 'artifacts', appId, 'users', currentUser.uid);
+        const muted = isUserMuted(uid);
+        await updateDoc(ref, { [`settings.muted`]: muted ? arrayRemove(uid) : arrayUnion(uid) });
+        showToast(muted ? "Nicht mehr stumm" : "Stummgeschaltet", "info");
+      } catch(e) {
+        console.error(e);
+        showToast("Stumm konnte nicht geändert werden", "error");
+      }
+    };
+
+    window.toggleBlockManagedFriend = async () => {
+      const uid = activeManagedFriendUid;
+      if(!uid) return;
+
+      try {
+        const ref = doc(db, 'artifacts', appId, 'users', currentUser.uid);
+        const blocked = isBlocked(uid);
+        await updateDoc(ref, { [`settings.blocked`]: blocked ? arrayRemove(uid) : arrayUnion(uid) });
+        showToast(blocked ? "Entblockiert" : "Blockiert", blocked ? "success" : "error");
+        if(!blocked) { closeFriendManage(); showView('dashboard'); }
+      } catch(e) {
+        console.error(e);
+        showToast("Blockieren konnte nicht geändert werden", "error");
+      }
+    };
+
+    window.removeManagedFriend = async () => {
+      const uid = activeManagedFriendUid;
+      if(!uid) return;
+
+      const p = friendManageCache[uid] || { name: 'dieser Benutzer' };
+      const name = getFriendDisplayName(uid, p);
+
+      if(!confirm(`Freundschaft mit "${name}" wirklich entfernen?`)) return;
+
+      try {
+        const ids = [currentUser.uid, uid].sort();
+        const friendshipId = `${ids[0]}_${ids[1]}`;
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'friendships', friendshipId));
+
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'friendRequests', `${currentUser.uid}_${uid}`)).catch(()=>{});
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'friendRequests', `${uid}_${currentUser.uid}`)).catch(()=>{});
+
+        const chatId = `${ids[0]}_${ids[1]}`;
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'chats', chatId), {
+          archivedBy: arrayUnion(currentUser.uid),
+          updatedAt: serverTimestamp()
+        }, { merge: true }).catch(()=>{});
+
+        closeFriendManage();
+        showToast("Freund entfernt", "success");
+      } catch(e) {
+        console.error(e);
+        showToast("Freund konnte nicht entfernt werden", "error");
+      }
+    };
+
+    // --- Chat Logic ---
+    window.openChat = async (uid, p) => {
+      activeChatPartner = { uid: uid, ...p };
+      const ids = [currentUser.uid, uid].sort();
+      activeChatId = `${ids[0]}_${ids[1]}`;
+
+      document.getElementById('chat-partner-name').innerText = p.name;
+      const avatar = p.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=10b981&color=fff`;
+      document.getElementById('chat-partner-avatar').src = avatar;
+
+      updateMinigameButtonVisibility();
+
+      if(unsubPartnerProfile) unsubPartnerProfile();
+      unsubPartnerProfile = onSnapshot(doc(db, 'artifacts', appId, 'users', uid), (s) => {
+        if(s.exists()) {
+          const partnerData = s.data();
+          const now = Date.now();
+          const lastSeen = partnerData.lastSeen ? partnerData.lastSeen.toMillis() : 0;
+          const isOnline = partnerData.online === true || (lastSeen && (now - lastSeen < 120000));
+
+          document.getElementById('chat-partner-status-indicator').className =
+            `w-2 h-2 rounded-full ${isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`;
+          document.getElementById('chat-partner-status-text').innerText = isOnline ? 'Online' : 'Offline';
+          document.getElementById('chat-partner-status-text').className =
+            `text-xs ${isOnline ? 'text-green-600 dark:text-green-400' : 'text-slate-400'} font-light`;
+        }
+      });
+
+      showView('chat');
+      localStorage.setItem('lastOpened_'+activeChatId, String(Date.now()));
+
+      if(unsubChat) unsubChat();
+      if(unsubChatMeta) unsubChatMeta();
+
+      const chatMetaRef = doc(db, 'artifacts', appId, 'public', 'data', 'chats', activeChatId);
+      unsubChatMeta = onSnapshot(chatMetaRef, (s) => {
+        if(s.exists()) checkChatPermissions(s.data());
+        else checkChatPermissions({});
+      });
+
+      const q = query(
+        collection(db, 'artifacts', appId, 'public', 'data', 'chats', activeChatId, 'messages'),
+        orderBy('timestamp', 'asc'),
+        limit(100)
+      );
+
+      unsubChat = onSnapshot(q, snap => {
+        renderMessages(snap);
+        if(activeChatId) localStorage.setItem('lastOpened_'+activeChatId, String(Date.now()));
+      });
+    };
+
+    function checkChatPermissions(chatData) {
+      const inp = document.getElementById('message-input');
+      const btn = document.getElementById('btn-send');
+      const lastSender = chatData.lastSender;
+      const spamVotes = chatData.spamVotes || [];
+
+      const myVote = spamVotes.includes(currentUser.uid);
+      const partnerVote = spamVotes.includes(activeChatPartner.uid);
+      const isSpamActive = myVote && partnerVote;
+
+      const toggleBtn = document.getElementById('btn-spam-toggle');
+      if(toggleBtn) {
+        if(myVote) {
+          toggleBtn.classList.remove('bg-slate-200');
+          toggleBtn.classList.add('bg-emerald-500');
+          toggleBtn.querySelector('div').classList.add('translate-x-6');
+        } else {
+          toggleBtn.classList.add('bg-slate-200');
+          toggleBtn.classList.remove('bg-emerald-500');
+          toggleBtn.querySelector('div').classList.remove('translate-x-6');
+        }
+      }
+
+      const statusEl = document.getElementById('pingpong-status');
+      if(isSpamActive) statusEl.classList.remove('hidden');
+      else statusEl.classList.add('hidden');
+
+      const locked = (lastSender === currentUser.uid && !isSpamActive);
+      setTurnLockUI(locked);
+
+      if (locked) {
+        inp.placeholder = "Warte auf Antwort...";
+      } else {
+        inp.placeholder = isSpamActive ? "Nachricht (Spam aktiv)..." : "Du bist dran...";
+      }
+    }
+
+    window.toggleSpamMode = async () => {
+      if(!activeChatId || !activeChatPartner) return;
+      const ref = doc(db, 'artifacts', appId, 'public', 'data', 'chats', activeChatId);
+
+      const snap = await getDoc(ref);
+      const data = snap.exists() ? snap.data() : {};
+      const spamVotes = data.spamVotes || [];
+
+      if(spamVotes.includes(currentUser.uid)) {
+        await updateDoc(ref, { spamVotes: arrayRemove(currentUser.uid) });
+        showToast("Spam-Modus deaktiviert", "info");
+      } else {
+        await updateDoc(ref, { spamVotes: arrayUnion(currentUser.uid) });
+        showToast("Spam-Modus aktiviert", "success");
+        if(spamVotes.includes(activeChatPartner.uid)) showToast("Spam-Modus jetzt aktiv für beide!", "success");
+      }
+    };
+
+    window.openFriendSettingsModal = () => {
+      if(!activeChatPartner) return;
+      document.getElementById('friend-settings-modal').classList.remove('hidden');
+    };
+
+    window.closeFriendSettings = () => {
+      document.getElementById('friend-settings-modal').classList.add('hidden');
+    };
+
+    // --- View-once (C): mark on open, delete after 30s ---
+    async function markViewOnceSeenAndScheduleDelete(messageId) {
+      if(!activeChatId || !messageId) return;
+
+      const msgRef = doc(db, 'artifacts', appId, 'public', 'data', 'chats', activeChatId, 'messages', messageId);
+      const snap = await getDoc(msgRef);
+      if(!snap.exists()) return;
+
+      const m = snap.data();
+      if(!m?.viewOnce) return;
+
+      if(!m.viewOnceSeenAt) {
+        await updateDoc(msgRef, { viewOnceSeenAt: serverTimestamp() }).catch(()=>{});
+      }
+
+      setTimeout(async () => {
+        try {
+          const s2 = await getDoc(msgRef);
+          if(!s2.exists()) return;
+          const m2 = s2.data();
+          if(!m2?.viewOnce) return;
+
+          const seenAt = m2.viewOnceSeenAt ? m2.viewOnceSeenAt.toMillis() : 0;
+          if(seenAt && Date.now() - seenAt >= 30000) {
+            await deleteDoc(msgRef);
+          }
+        } catch(e) { /* ignore */ }
+      }, 30000);
+    }
+
+    async function cleanupExpiredViewOnceInSnapshot(snap) {
+      try {
+        const now = Date.now();
+        const deletions = [];
+        snap.forEach(d => {
+          const m = d.data();
+          if(m?.viewOnce && m?.viewOnceSeenAt?.toMillis) {
+            const seenAt = m.viewOnceSeenAt.toMillis();
+            if(seenAt && (now - seenAt >= 30000)) {
+              deletions.push(deleteDoc(d.ref).catch(()=>{}));
+            }
+          }
+        });
+        if(deletions.length) await Promise.all(deletions);
+      } catch(_) {}
+    }
+
+    function renderMessages(s) {
+      const c = document.getElementById('messages-container');
+      c.innerHTML = '';
+
+      cleanupExpiredViewOnceInSnapshot(s).catch(()=>{});
+
+      s.forEach(docSnap => {
+        const m = docSnap.data();
+        const me = m.sender === currentUser.uid;
+
+        if(m?.viewOnce && m?.viewOnceSeenAt?.toMillis) {
+          const seenAt = m.viewOnceSeenAt.toMillis();
+          if(seenAt && Date.now() - seenAt >= 30000) return;
+        }
+
+        const senderName = me ? 'Du' : (activeChatPartner?.name || 'Kontakt');
+        const preview = (m.type === 'image') ? (m.viewOnce ? '📷 Bild (1×)' : '📷 Bild')
+          : (m.type === 'call') ? '📞 Anruf'
+          : String(m.text || '').slice(0, 120);
+
+        const time = m.timestamp
+          ? new Date(m.timestamp.toMillis ? m.timestamp.toMillis() : m.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
+          : '';
+
+        let replyHtml = '';
+        if (m.replyTo && m.replyTo.preview) {
+          const rtName = (m.replyTo.sender === currentUser.uid) ? 'Du' : (activeChatPartner?.name || 'Kontakt');
+          const rtPrev = String(m.replyTo.preview).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          replyHtml = `
+            <div class="mb-2 px-3 py-2 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10">
+              <p class="text-xs font-semibold text-slate-600 dark:text-slate-200/80">${escapeHtml(rtName)}</p>
+              <p class="text-sm text-slate-700 dark:text-slate-200 truncate font-light">${rtPrev}</p>
+            </div>
+          `;
+        }
+
+        let contentHtml = '';
+        if (m.type === 'image') {
+          const badge = m.viewOnce ? `<span class="absolute top-2 left-2 text-xs font-semibold bg-black/60 text-white px-2 py-1 rounded-full">1×</span>` : '';
+          const hint = (m.viewOnce && m.viewOnceSeenAt) ? `<span class="absolute bottom-2 left-2 text-[10px] font-semibold bg-black/50 text-white px-2 py-1 rounded-full">läuft…</span>` : '';
+          contentHtml = `
+            <div class="relative">
+              ${badge}
+              ${hint}
+              <img src="${m.content}" class="max-w-[240px] rounded-xl shadow cursor-pointer border border-white/10"
+                   onclick="showFullScreenImage('${m.content}', '${docSnap.id}', ${m.viewOnce ? 'true' : 'false'})">
+            </div>
+          `;
+        } else if (m.type === 'call') {
+          const state = m.callState || 'missed';
+          const label = (state === 'missed')
+            ? (me ? 'Verpasster Anruf (ausgehend)' : 'Verpasster Anruf')
+            : (state === 'ended')
+              ? 'Anruf beendet'
+              : 'Anruf';
+          contentHtml = `
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-slate-100/70 dark:bg-white/5 flex items-center justify-center border border-slate-200/60 dark:border-white/10">
+                <i class="fa-solid fa-phone ${state === 'missed' ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-200'}"></i>
+              </div>
+              <div>
+                <p class="font-semibold dark:text-white">${label}</p>
+                <p class="text-xs text-slate-400 font-light">${time}</p>
+              </div>
+            </div>
+          `;
+        } else {
+          let t = String(m.text || '');
+          t = t.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+          contentHtml = `<p class="break-words font-light">${t}</p>`;
+        }
+
+        const bubbleClass = me
+          ? 'bg-emerald-600/90 text-white'
+          : 'bg-white/80 dark:bg-white/5 text-slate-800 dark:text-white border border-slate-200/70 dark:border-white/10';
+
+        const html = `
+          <div class="flex ${me ? 'justify-end' : 'justify-start'} animate-[fadeIn_0.2s]">
+            <div class="max-w-[75%] px-4 py-2 rounded-2xl shadow-sm ${bubbleClass}"
+                 data-mid="${docSnap.id}"
+                 data-sender="${m.sender || ''}"
+                 data-sendername="${senderName.replace(/"/g,'&quot;')}"
+                 data-preview="${preview.replace(/"/g,'&quot;')}"
+                 data-type="${m.type || 'text'}">
+              ${replyHtml}
+              ${contentHtml}
+              ${m.type === 'call' ? '' : `<p class="text-xs mt-1 opacity-70 ${me ? 'text-white/80' : 'text-slate-400'} font-light">${time}</p>`}
+            </div>
+          </div>
+        `;
+        c.insertAdjacentHTML('beforeend', html);
+      });
+
+      bindMessageGestures();
+      c.scrollTop = c.scrollHeight;
+    }
+
+    // --- Reply / Gestures ---
+    let replyTarget = null;
+
+    window.setReplyTarget = (payload) => {
+      replyTarget = payload;
+      const bar = document.getElementById('reply-bar');
+      if(!bar) return;
+      document.getElementById('reply-to-name').textContent = payload?.senderName || 'Kontakt';
+      document.getElementById('reply-to-preview').textContent = payload?.preview || '';
+      bar.classList.remove('hidden');
+    };
+
+    window.clearReplyTarget = () => {
+      replyTarget = null;
+      const bar = document.getElementById('reply-bar');
+      if(bar) bar.classList.add('hidden');
+    };
+
+    window.bindMessageGestures = () => {
+      const bubbles = document.querySelectorAll('#messages-container [data-mid]');
+      bubbles.forEach(b => {
+        if(b.__bound) return;
+        b.__bound = true;
+
+        let pressTimer = null;
+
+        const start = () => {
+          if((b.dataset.type || '') === 'call') return;
+
+          pressTimer = setTimeout(() => {
+            const payload = {
+              id: b.dataset.mid,
+              sender: b.dataset.sender,
+              senderName: b.dataset.sendername || 'Kontakt',
+              preview: b.dataset.preview || ''
+            };
+            setReplyTarget(payload);
+            navigator.vibrate?.(15);
+          }, 450);
+        };
+
+        const cancel = () => { if(pressTimer) clearTimeout(pressTimer); pressTimer = null; };
+
+        b.addEventListener('pointerdown', start);
+        b.addEventListener('pointerup', cancel);
+        b.addEventListener('pointercancel', cancel);
+        b.addEventListener('pointerleave', cancel);
+      });
+    };
+
+    // Attach menu
+    window.toggleAttachMenu = () => {
+      const m = document.getElementById('attach-menu');
+      if(!m) return;
+      m.classList.toggle('hidden');
+
+      if(!window.__attachOutsideBound) {
+        window.__attachOutsideBound = true;
+        document.addEventListener('click', (e) => {
+          const menu = document.getElementById('attach-menu');
+          if(!menu || menu.classList.contains('hidden')) return;
+
+          const btn = e.target.closest('button[onclick*="toggleAttachMenu"]');
+          const inside = e.target.closest('#attach-menu');
+          if(!btn && !inside) menu.classList.add('hidden');
+        });
+      }
+    };
+
+    window.closeAttachMenu = () => {
+      const m = document.getElementById('attach-menu');
+      if(m) m.classList.add('hidden');
+    };
+
+    // send text message (intercepts keywords; keeps keyboard open)
+    window.sendMessage = async (e) => {
+      e.preventDefault();
+      const inp = document.getElementById('message-input');
+      const txt = inp.value.trim();
+      if(!txt) return;
+
+      const lower = txt.toLowerCase();
+
+      // Keywords: open/close fake screen; keyword is NOT sent
+      if(lower === 'postit') {
+        inp.value = '';
+        showFakeScreen();
+        setTimeout(() => inp.focus(), 0);
+        return;
+      }
+      if(lower === 'pingpong') {
+        inp.value = '';
+        if(isFakeScreenVisible()) hideFakeScreen();
+        setTimeout(() => inp.focus(), 0);
+        return;
+      }
+
+      if(!activeChatId || !activeChatPartner) return;
+
+      // Keep keyboard: don't disable input (only button while sending)
+      inp.value = '';
+      const sendBtn = document.getElementById('btn-send');
+      sendBtn.disabled = true;
+      setTimeout(() => inp.focus(), 0);
+
+      try {
+        const chatRef = doc(db, 'artifacts', appId, 'public', 'data', 'chats', activeChatId);
+        await setDoc(chatRef, {
+          participants: [currentUser.uid, activeChatPartner.uid],
+          lastSender: currentUser.uid,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+
+        const msg = {
+          text: txt,
+          sender: currentUser.uid,
+          timestamp: serverTimestamp(),
+          type: 'text'
+        };
+        if (replyTarget && replyTarget.id) {
+          msg.replyTo = { id: replyTarget.id, sender: replyTarget.sender || null, preview: replyTarget.preview || '' };
+        }
+
+        await addDoc(
+          collection(db, 'artifacts', appId, 'public', 'data', 'chats', activeChatId, 'messages'),
+          msg
+        );
+        clearReplyTarget();
+
+        // button can re-enable; turn-lock is handled by onSnapshot(checkChatPermissions)
+        sendBtn.disabled = false;
+        setTimeout(() => inp.focus(), 0);
+
+      } catch(e){
+        console.error(e);
+        showToast("Fehler beim Senden", "error");
+        sendBtn.disabled = false;
+        setTimeout(() => inp.focus(), 0);
+      }
+    };
+
+    // send images (viewOnce supported)
+    window.handleImageUpload = async (inp, viewOnce=false) => {
+      if(!inp.files[0] || !activeChatId || !activeChatPartner) return;
+      showToast("Sende Bild...", "info");
+      try {
+        const b64 = await resizeImage(inp.files[0], 800);
+
+        await setDoc(
+          doc(db, 'artifacts', appId, 'public', 'data', 'chats', activeChatId),
+          { lastSender: currentUser.uid, updatedAt: serverTimestamp() },
+          { merge: true }
+        );
+
+        await addDoc(
+          collection(db, 'artifacts', appId, 'public', 'data', 'chats', activeChatId, 'messages'),
+          {
+            type: 'image',
+            content: b64,
+            sender: currentUser.uid,
+            timestamp: serverTimestamp(),
+            viewOnce: !!viewOnce,
+            viewOnceSeenAt: null
+          }
+        );
+        inp.value='';
+      } catch(e){
+        console.error(e);
+        showToast("Fehler beim Hochladen", "error");
+      }
+    };
+
+    // image modal open/close
+    window.showFullScreenImage = async (src, messageId=null, isViewOnce=false) => {
+      window.__modalImageMessageId = messageId;
+      window.__modalImageViewOnce = !!isViewOnce;
+
+      document.getElementById('modal-img').src = src;
+      document.getElementById('image-modal').classList.remove('hidden');
+
+      if(isViewOnce && messageId) {
+        try { await markViewOnceSeenAndScheduleDelete(messageId); }
+        catch(e) { console.error(e); }
+      }
+    };
+
+    window.handleImageModalClick = async () => {
+      document.getElementById('image-modal').classList.add('hidden');
+      window.__modalImageMessageId = null;
+      window.__modalImageViewOnce = false;
+    };
+
+    // --- WebRTC ---
+    let localStream, peerConnection, currentCallId;
+    let callWasAnswered = false;
+    const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+    window.startVideoCall = async () => {
+      if(!activeChatPartner) return;
+      callWasAnswered = false;
+      document.getElementById('video-overlay').classList.remove('hidden');
+      document.getElementById('call-status').innerText=`Rufe ${activeChatPartner.name} an...`;
+
+      try {
+        await initLocalStream();
+        createPeerConnection();
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+
+        const cd = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'calls'), {
+          from: currentUser.uid,
+          to: activeChatPartner.uid,
+          chatId: activeChatId,
+          type: 'offer',
+          offer: {type:offer.type, sdp:offer.sdp},
+          timestamp: serverTimestamp()
+        });
+        currentCallId = cd.id;
+
+        onSnapshot(cd.ref, async s => {
+          if(!s.exists()) {
+            try {
+              if(!callWasAnswered) {
+                await logCallMessage(activeChatId, {
+                  callState: 'missed',
+                  direction: 'outgoing',
+                  otherUid: activeChatPartner?.uid || null,
+                  otherName: activeChatPartner?.name || 'Kontakt'
+                });
+              }
+            } catch(e) { console.error(e); }
+
+            endVideoCall('declined');
+            showToast("Anruf abgelehnt", "info");
+            return;
+          }
+
+          const d = s.data();
+          if(d?.answer && !peerConnection.currentRemoteDescription) {
+            callWasAnswered = true;
+            peerConnection.setRemoteDescription(new RTCSessionDescription(d.answer));
+            document.getElementById('call-status').innerText="Verbunden";
+          }
+
+          if(d?.ended && currentCallId === cd.id) {
+            showToast("Anruf beendet", "info");
+            endVideoCall('remote-ended');
+            return;
+          }
+        });
+      } catch(error) {
+        console.error("Error starting call:", error);
+        showToast("Fehler beim Starten des Anrufs", "error");
+        endVideoCall();
+      }
+    };
+
+    async function initLocalStream() {
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
+        document.getElementById('local-video').srcObject = localStream;
+      } catch(e) {
+        alert("Kamera/Mikrofon Fehler: "+e.message);
+        endVideoCall();
+        throw e;
+      }
+    }
+
+    function createPeerConnection() {
+      peerConnection = new RTCPeerConnection(rtcConfig);
+      if(localStream) localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
+
+      peerConnection.ontrack = e => {
+        if(e.streams && e.streams[0]) document.getElementById('remote-video').srcObject = e.streams[0];
+      };
+
+      peerConnection.onicecandidate = e => {
+        if(e.candidate && currentCallId) {
+          addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'calls', currentCallId, 'candidates'), e.candidate.toJSON());
+        }
+      };
+
+      if(currentCallId) {
+        onSnapshot(
+          query(collection(db, 'artifacts', appId, 'public', 'data', 'calls', currentCallId, 'candidates')),
+          s => {
+            s.docChanges().forEach(c => {
+              if(c.type === 'added' && peerConnection.remoteDescription) {
+                peerConnection.addIceCandidate(new RTCIceCandidate(c.doc.data())).catch(console.log);
+              }
+            });
+          }
+        );
+      }
+    }
+
+    window.endVideoCall = async (reason='ended') => {
+      try { if(localStream) localStream.getTracks().forEach(t => t.stop()); } catch(_) {}
+      try { if(peerConnection) peerConnection.close(); } catch(_) {}
+
+      if(currentCallId) {
+        const ref = doc(db, 'artifacts', appId, 'public', 'data', 'calls', currentCallId);
+        try {
+          await updateDoc(ref, {
+            ended: true,
+            endedBy: currentUser?.uid || null,
+            endReason: reason,
+            endedAt: serverTimestamp()
+          });
+        } catch(_) {}
+        try { await deleteDoc(ref); } catch(_) {}
+        currentCallId = null;
+      }
+
+      callWasAnswered = false;
+      document.getElementById('video-overlay').classList.add('hidden');
+    };
+
+    window.toggleAudio = () => {
+      if(localStream) {
+        const tracks = localStream.getAudioTracks();
+        if(tracks.length > 0) {
+          tracks[0].enabled = !tracks[0].enabled;
+          const btn = document.getElementById('btn-audio');
+          if(tracks[0].enabled) btn.classList.remove('bg-red-500');
+          else btn.classList.add('bg-red-500');
+        }
+      }
+    };
+
+    window.toggleVideo = () => {
+      if(localStream) {
+        const tracks = localStream.getVideoTracks();
+        if(tracks.length > 0) {
+          tracks[0].enabled = !tracks[0].enabled;
+          const btn = document.getElementById('btn-video');
+          if(tracks[0].enabled) btn.classList.remove('bg-red-500');
+          else btn.classList.add('bg-red-500');
+        }
+      }
+    };
+
+    function makeChatId(a, b) { return [String(a), String(b)].sort().join('_'); }
+
+    async function logCallMessage(chatId, payload) {
+      if(!chatId) return;
+      try {
+        const direction = payload?.direction || 'incoming';
+        const otherUid = payload?.otherUid || null;
+        const otherName = payload?.otherName || 'Kontakt';
+        const senderId = (direction === 'incoming') ? otherUid : (currentUser?.uid || null);
+
+        const msg = {
+          type: 'call',
+          callState: payload?.callState || 'missed',
+          direction,
+          sender: senderId,
+          otherUid,
+          otherName,
+          timestamp: serverTimestamp()
+        };
+
+        await addDoc(
+          collection(db, 'artifacts', appId, 'public', 'data', 'chats', chatId, 'messages'),
+          msg
+        );
+
+        await setDoc(
+          doc(db, 'artifacts', appId, 'public', 'data', 'chats', chatId),
+          { lastSender: senderId, updatedAt: serverTimestamp() },
+          { merge: true }
+        );
+      } catch(e) { console.error(e); }
+    }
+
+    function watchActiveCall(callId) {
+      try { if(window.__callDocUnsub) { window.__callDocUnsub(); window.__callDocUnsub = null; } } catch(_) {}
+      const ref = doc(db, 'artifacts', appId, 'public', 'data', 'calls', callId);
+      window.__callDocUnsub = onSnapshot(ref, (snap) => {
+        if(currentCallId !== callId) return;
+        if(!snap.exists()) { showToast("Anruf beendet", "info"); endVideoCall('remote-ended'); return; }
+        const d = snap.data();
+        if(d?.ended) { showToast("Anruf beendet", "info"); endVideoCall('remote-ended'); }
+      });
+    }
+
+    // Common
+    window.copyFriendCode = () => {
+      if(!userProfile) return;
+      navigator.clipboard.writeText(userProfile.friendCode).then(()=>{
+        showToast("Code kopiert!", "success");
+      }).catch(()=>{
+        showToast("Kopieren fehlgeschlagen", "error");
+      });
+    };
+
+    window.sendFriendRequestByCode = async () => {
+      const c = document.getElementById('add-friend-input').value.toUpperCase().trim();
+      if(c.length!==4) { showToast("Code muss 4 Zeichen haben", "error"); return; }
+      if(!currentUser || !userProfile) { showToast("Bitte zuerst einloggen", "error"); return; }
+      if(c === userProfile.friendCode) { showToast("Das ist dein eigener Code!", "error"); return; }
+
+      try {
+        let s;
+        try { s = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'codes', c)); }
+        catch(e) { console.log("codes:get", e); showToast(friendlyFirebaseError(e, "Rules blockieren (codes:get)"), "error"); return; }
+
+        if(!s.exists()) { showToast("Ungültiger Code", "error"); return; }
+
+        const uid = s.data().uid;
+        if(uid === currentUser.uid) { showToast("Das bist du selbst!", "error"); return; }
+
+        const friendshipId = `${[currentUser.uid, uid].sort().join('_')}`;
+        let friendCheck;
+        try { friendCheck = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'friendships', friendshipId)); }
+        catch(e) { console.log("friendships:get", e); showToast(friendlyFirebaseError(e, "Rules blockieren (friendships:get)"), "error"); return; }
+
+        if(friendCheck.exists()) { showToast("Bereits befreundet", "info"); return; }
+
+        const requestId = `${currentUser.uid}_${uid}`;
+        let existing;
+        try { existing = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'friendRequests', requestId)); }
+        catch(e) { console.log("friendRequests:get", e); showToast(friendlyFirebaseError(e, "Rules blockieren (friendRequests:get)"), "error"); return; }
+
+        if(existing.exists() && existing.data().status === 'pending') { showToast("Anfrage ist bereits gesendet", "info"); return; }
+
+        try {
+          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'friendRequests', requestId), {
+            from: currentUser.uid,
+            to: uid,
+            status: 'pending',
+            createdAt: serverTimestamp()
+          });
+        } catch(e) {
+          console.log("friendRequests:create", e);
+          showToast(friendlyFirebaseError(e, "Rules blockieren (friendRequests:create)"), "error");
+          return;
+        }
+
+        document.getElementById('add-friend-input').value = '';
+        showToast("Freundschaftsanfrage gesendet", "success");
+        document.getElementById('section-outgoing').classList.remove('hidden');
+        document.getElementById('section-outgoing').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch(e) {
+        console.log(e);
+        showToast(friendlyFirebaseError(e, "Fehler beim Senden"), "error");
+      }
+    };
+
+    window.acceptRequest = async(rid, uid) => {
+      const p1 = currentUser.uid < uid ? currentUser.uid : uid;
+      const p2 = currentUser.uid < uid ? uid : currentUser.uid;
+
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'friendRequests', rid), {status: 'accepted'});
+
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'friendships', `${p1}_${p2}`), {
+        participants: [p1, p2],
+        createdAt: serverTimestamp()
+      });
+
+      showToast("Freundschaft angenommen", "success");
+    };
+
+    window.declineRequest = async (rid) => {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'friendRequests', rid));
+      showToast("Anfrage abgelehnt", "info");
+    };
+
+    window.withdrawRequest = async (rid) => {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'friendRequests', rid));
+      showToast("Anfrage zurückgezogen", "info");
+    };
+
+    function isBlocked(uid) { return userProfile?.settings?.blocked?.includes(uid); }
+    function isUserMuted(uid) { return userProfile?.settings?.muted?.includes(uid); }
+
+    window.toggleBlockCurrentChat = async () => {
+      if(!activeChatPartner) return;
+      const uid = activeChatPartner.uid;
+      const add = !isBlocked(uid);
+
+      await updateDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid), {
+        [`settings.blocked`]: add ? arrayUnion(uid) : arrayRemove(uid)
+      });
+
+      showToast(add ? `${activeChatPartner.name} blockiert` : `${activeChatPartner.name} entblockiert`, add ? "error" : "success");
+      if(add) showView('dashboard');
+    };
+
+    window.toggleMuteCurrentChat = async () => {
+      if(!activeChatPartner) return;
+      const uid = activeChatPartner.uid;
+      const add = !isUserMuted(uid);
+
+      await updateDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid), {
+        [`settings.muted`]: add ? arrayUnion(uid) : arrayRemove(uid)
+      });
+
+      const icon = document.getElementById('icon-mute');
+      const text = document.getElementById('text-mute');
+
+      if(add) {
+        icon.className = 'fa-solid fa-volume-xmark w-4';
+        text.textContent = 'Nicht stumm';
+      } else {
+        icon.className = 'fa-solid fa-volume-high w-4';
+        text.textContent = 'Stumm';
+      }
+
+      showToast(add ? `${activeChatPartner.name} stummgeschaltet` : `${activeChatPartner.name} nicht mehr stumm`, "info");
+    };
+
+    const userCache = {};
+    async function fetchUserProfile(uid) {
+      if(userCache[uid]) return userCache[uid];
+      try {
+        const s = await getDoc(doc(db, 'artifacts', appId, 'users', uid));
+        const d = s.exists() ? s.data() : {name: 'Unbekannt', avatar: null, friendCode: '----'};
+        userCache[uid] = d;
+        return d;
+      } catch(e) {
+        console.error("Error fetching profile:", e);
+        return {name: 'Unbekannt', avatar: null, friendCode: '----'};
+      }
+    }
+
+    window.showView = (v) => {
+      currentView = v;
+      ['dashboard','chat','settings'].forEach(id => {
+        document.getElementById('view-'+id).classList.toggle('hidden', id!==v);
+      });
+      document.getElementById('main-header').classList.toggle('hidden', v==='chat');
+      document.getElementById('chat-menu').classList.add('hidden');
+      document.getElementById('minigame-menu').classList.add('hidden');
+      document.getElementById('minigame-modal').classList.add('hidden');
+
+      if(v==='settings') {
+        updateUIFromProfile();
+        document.getElementById('name-edit-container').classList.add('hidden');
+        document.getElementById('settings-name-display').classList.remove('hidden');
+      }
+    };
+
+    window.toggleChatMenu = () => {
+      document.getElementById('chat-menu').classList.toggle('hidden');
+    };
+
+    function friendlyFirebaseError(e, fallback) {
+      const code = (e && e.code) ? String(e.code) : "";
+      const map = {
+        "permission-denied": "Keine Berechtigung (Rules blockieren).",
+        "unauthenticated": "Du bist nicht eingeloggt.",
+        "not-found": "Eintrag nicht gefunden.",
+        "already-exists": "Existiert bereits.",
+        "failed-precondition": "Voraussetzung nicht erfüllt (Index/Setup).",
+        "resource-exhausted": "Limit erreicht. Versuche es später nochmals.",
+        "unavailable": "Dienst aktuell nicht verfügbar. Internet/Firestore prüfen.",
+        "cancelled": "Aktion abgebrochen.",
+        "invalid-argument": "Ungültige Eingabe.",
+        "deadline-exceeded": "Zeitüberschreitung. Internet prüfen."
+      };
+      const short = map[code.replace("firebase:", "")] || map[code] || fallback || "Fehler";
+      return code ? `${short} (${code})` : short;
+    }
+
+    function showToast(m, type) {
+      const el = document.getElementById('toast');
+      const icon = document.getElementById('toast-icon');
+
+      if(type === 'success') {
+        icon.innerHTML = '<i class="fa-solid fa-check"></i>';
+        el.className = 'fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-emerald-600 text-white px-4 py-2 rounded-full text-sm shadow-lg opacity-0 transition-opacity duration-300 pointer-events-none z-[80] flex items-center gap-2 border border-white/10';
+      } else if(type === 'error') {
+        icon.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+        el.className = 'fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-4 py-2 rounded-full text-sm shadow-lg opacity-0 transition-opacity duration-300 pointer-events-none z-[80] flex items-center gap-2 border border-white/10';
+      } else {
+        icon.innerHTML = '<i class="fa-solid fa-info"></i>';
+        el.className = 'fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-ink-900 text-white px-4 py-2 rounded-full text-sm shadow-lg opacity-0 transition-opacity duration-300 pointer-events-none z-[80] flex items-center gap-2 border border-white/10';
+      }
+
+      document.getElementById('toast-msg').innerText = m;
+      el.style.opacity = '1';
+
+      setTimeout(() => { el.style.opacity = '0'; }, 3000);
+    }
+
+    window.handleLogout = async () => {
+      if(currentUser) {
+        await updateDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid), {
+          online: false,
+          lastSeen: serverTimestamp()
+        }).catch(()=>{});
+      }
+
+      await signOut(auth);
+      window.location.reload();
+    };
+
+    // Close menus on outside click
+    document.addEventListener('click', (e) => {
+      const minigameMenu = document.getElementById('minigame-menu');
+      const minigameButton = document.getElementById('minigame-button');
+      if(minigameMenu && !minigameMenu.contains(e.target) && minigameButton && !minigameButton.contains(e.target)) {
+        minigameMenu.classList.add('hidden');
+      }
+
+      const chatMenu = document.getElementById('chat-menu');
+      const chatMenuButton = document.querySelector('button[onclick="toggleChatMenu()"]');
+      if(chatMenu && !chatMenu.contains(e.target) && chatMenuButton && !chatMenuButton.contains(e.target)) {
+        chatMenu.classList.add('hidden');
+      }
+    });
+  </script>
+</body>
+</html>
