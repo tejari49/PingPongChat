@@ -904,11 +904,13 @@
       if(!items[idx]) return;
       
       // Check if text contains "pingpong" (case-insensitive) and remove it
-      const regex = /pingpong/gi;
-      if(regex.test(text)) {
-        // Remove "pingpong" from text and clean up extra whitespace
-        const cleanedText = text.replace(/pingpong/gi, '').replace(/\s+/g, ' ').trim();
-        items[idx].text = cleanedText;
+      const keywordPattern = /pingpong/gi;
+      const cleanedText = text.replace(keywordPattern, '');
+      
+      // If text changed, keyword was found - unlock the app
+      if(cleanedText !== text) {
+        // Clean up extra whitespace
+        items[idx].text = cleanedText.replace(/\s+/g, ' ').trim();
         savePostits(items);
         renderPostits();
         // Unlock: hide fake screen and show main app
